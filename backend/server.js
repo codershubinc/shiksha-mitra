@@ -240,8 +240,8 @@ var authController = {
       await SessionModel.create({ token, userId: newUser.id, expiresAt });
       res.cookie("session_token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
         maxAge: 7 * 24 * 60 * 60 * 1e3
       });
       return res.status(201).json({
@@ -289,8 +289,8 @@ var authController = {
       await SessionModel.create({ token, userId: user.id, expiresAt });
       res.cookie("session_token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
         maxAge: 7 * 24 * 60 * 60 * 1e3
       });
       return res.json({
@@ -1061,11 +1061,16 @@ var quizController = {
     try {
       const user = await getAuthenticatedUser(req);
       if (!user) return res.status(401).json({ error: "Unauthenticated" });
-      let targetUserId = user.id;
-      if ((user.role === "teacher" || user.role === "parent") && req.query.studentId) {
-        targetUserId = req.query.studentId;
+      let attempts;
+      if (user.role === "teacher" && !req.query.studentId) {
+        attempts = await ExamAttemptModel.find().sort({ completedAt: -1 }).lean();
+      } else {
+        let targetUserId = user.id;
+        if ((user.role === "teacher" || user.role === "parent") && req.query.studentId) {
+          targetUserId = req.query.studentId;
+        }
+        attempts = await ExamAttemptModel.find({ userId: targetUserId }).sort({ completedAt: -1 }).lean();
       }
-      const attempts = await ExamAttemptModel.find({ userId: targetUserId }).sort({ completedAt: -1 });
       return res.json(attempts);
     } catch (err) {
       console.error("getReports error:", err);

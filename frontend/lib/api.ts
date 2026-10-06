@@ -240,5 +240,14 @@ export const api = {
     });
     if (!res.ok) throw new Error('Failed to submit attempt');
     return res.json();
+  },
+
+  async getReports(studentId?: string) {
+    const query = studentId ? `?studentId=${studentId}` : '';
+    const res = await fetch(url(`/api/quiz/reports/all${query}`), {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch reports');
+    return res.json();
   }
 };

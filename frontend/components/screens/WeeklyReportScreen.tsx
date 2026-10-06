@@ -23,6 +23,20 @@ interface WeeklyReportScreenProps {
 export function WeeklyReportScreen({ onNavigate }: WeeklyReportScreenProps) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [latestScore, setLatestScore] = useState<number>(82);
+  const [maxScore, setMaxScore] = useState<number>(100);
+
+  React.useEffect(() => {
+    import('@/lib/api').then(({ api }) => {
+      api.getReports().then((data: any[]) => {
+        if (data && data.length > 0) {
+          const latest = data[0]; // Sort is completedAt -1 in backend
+          setLatestScore(latest.score);
+          setMaxScore(latest.totalQuestions);
+        }
+      }).catch(console.error);
+    });
+  }, []);
 
   const handleShare = () => {
     setCopied(true);
@@ -70,9 +84,9 @@ export function WeeklyReportScreen({ onNavigate }: WeeklyReportScreenProps) {
                   <span className="text-xs text-slate-400 font-medium block">Mock Exam Score</span>
                   <div className="flex items-baseline gap-1">
                     <span className="font-headline text-3xl font-bold text-white tabular-nums">
-                      82
+                      {latestScore}
                     </span>
-                    <span className="text-xs font-semibold text-slate-400">/100</span>
+                    <span className="text-xs font-semibold text-slate-400">/{maxScore}</span>
                   </div>
                 </div>
               </div>

@@ -22,6 +22,23 @@ export function TeacherDashboardScreen({ onNavigate }: TeacherDashboardScreenPro
   const [assignedTopic, setAssignedTopic] = useState<string | null>(null);
   const [isUpdatingModel, setIsUpdatingModel] = useState(false);
   const [modelUpdated, setModelUpdated] = useState(false);
+  const [reports, setReports] = useState<any[]>([]);
+  const [masteryScore, setMasteryScore] = useState<number>(43); // default
+
+  React.useEffect(() => {
+    import('@/lib/api').then(({ api }) => {
+      api.getReports().then((data: any[]) => {
+        setReports(data);
+        if (data.length > 0) {
+          const totalScore = data.reduce((sum, r) => sum + r.score, 0);
+          const totalQs = data.reduce((sum, r) => sum + r.totalQuestions, 0);
+          if (totalQs > 0) {
+            setMasteryScore(Math.round((totalScore / totalQs) * 100));
+          }
+        }
+      }).catch(console.error);
+    });
+  }, []);
 
   const handleUpdateModel = () => {
     setIsUpdatingModel(true);
@@ -128,7 +145,7 @@ export function TeacherDashboardScreen({ onNavigate }: TeacherDashboardScreenPro
               <span className="text-xs text-slate-400">Projected Cohort Growth</span>
               <div className="flex items-baseline gap-2">
                 <span className="font-headline text-3xl font-bold text-emerald-400 tabular-nums">
-                  +42%
+                  +{Math.min(100 - masteryScore, 42)}%
                 </span>
                 <span className="text-xs text-slate-400">Expected Score Lift</span>
               </div>
@@ -139,11 +156,11 @@ export function TeacherDashboardScreen({ onNavigate }: TeacherDashboardScreenPro
             {/* Current Foundational Math */}
             <div>
               <div className="flex justify-between text-xs font-semibold text-slate-400 mb-2">
-                <span>Current Foundational Mastery</span>
-                <span className="text-slate-200 tabular-nums">43%</span>
+                <span>Current Foundational Mastery ({reports.length} exams)</span>
+                <span className="text-slate-200 tabular-nums">{masteryScore}%</span>
               </div>
               <div className="h-3 w-full bg-slate-900 rounded-full overflow-hidden border border-white/5">
-                <div className="h-full bg-slate-600 rounded-full" style={{ width: '43%' }} />
+                <div className="h-full bg-slate-600 rounded-full transition-all duration-1000" style={{ width: `${masteryScore}%` }} />
               </div>
             </div>
 
@@ -154,12 +171,12 @@ export function TeacherDashboardScreen({ onNavigate }: TeacherDashboardScreenPro
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                   <span>Projected with AI Loophole Support</span>
                 </span>
-                <span className="tabular-nums">85%</span>
+                <span className="tabular-nums">{Math.min(100, masteryScore + 42)}%</span>
               </div>
               <div className="h-3.5 w-full bg-slate-900 rounded-full overflow-hidden border border-white/10 relative">
                 <div
-                  className="h-full bg-gradient-to-r from-teal-500 via-emerald-500 to-amber-500 rounded-full shadow-lg relative flex items-center justify-end pr-1"
-                  style={{ width: '85%' }}
+                  className="h-full bg-gradient-to-r from-teal-500 via-emerald-500 to-amber-500 rounded-full shadow-lg relative flex items-center justify-end pr-1 transition-all duration-1000"
+                  style={{ width: `${Math.min(100, masteryScore + 42)}%` }}
                 >
                   <span className="w-2 h-2 rounded-full bg-white animate-ping" />
                 </div>

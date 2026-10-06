@@ -84,14 +84,19 @@ export const quizController = {
       const user = await getAuthenticatedUser(req);
       if (!user) return res.status(401).json({ error: 'Unauthenticated' });
 
-      // If student, return their own attempts.
-      // If teacher/parent, this could be extended to accept a userId query param.
-      let targetUserId = user.id;
-      if ((user.role === 'teacher' || user.role === 'parent') && req.query.studentId) {
-        targetUserId = req.query.studentId as string;
+      let attempts;
+      if (user.role === 'teacher' && !req.query.studentId) {
+        // Teacher requesting global cohort data
+        attempts = await ExamAttemptModel.find().sort({ completedAt: -1 }).lean();
+      } else {
+        // Student or parent, or teacher requesting specific student
+        let targetUserId = user.id;
+        if ((user.role === 'teacher' || user.role === 'parent') && req.query.studentId) {
+          targetUserId = req.query.studentId as string;
+        }
+        attempts = await ExamAttemptModel.find({ userId: targetUserId }).sort({ completedAt: -1 }).lean();
       }
 
-      const attempts = await ExamAttemptModel.find({ userId: targetUserId }).sort({ completedAt: -1 });
       return res.json(attempts);
     } catch (err: any) {
       console.error('getReports error:', err);

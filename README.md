@@ -1,84 +1,95 @@
-# Shiksha Mitra AI
+# 🎓 Shiksha Mitra AI
 
-AI-Powered Socratic Mentor, Real-Time Voice Teacher Agent, and Classroom Analytics Platform.
-
----
-
-## Architecture
-
-- **`frontend/`**: React 19 + TypeScript + Vite + Tailwind CSS 4 + Lucide Icons
-- **`backend/`**: Modular Node.js Express server with standard controller/service/routes layout:
-  - `backend/routes/`: Route definitions (`/api/ai/*`, `/api/auth/*`, `/api/students/*`, etc.)
-  - `backend/controllers/`: Express controllers handling request/response logic
-  - `backend/services/`: Core business logic & Gemini AI / TTS / database integrations
-  - `backend/models/`: Data types and schemas
-  - `backend/config/`: Environment configuration
+**Shiksha Mitra AI** is a unified, AI-powered education platform designed to bridge the gap between Students, Teachers, and Parents. It leverages artificial intelligence to provide personalized learning, streamline evaluations, and deliver automated insights—all through a single cohesive ecosystem.
 
 ---
 
-## Quick Start (Local Run)
+## 🌟 Key Features
+
+### 🧑‍🎓 For Students
+* **Socratic Voice Mentor:** Meet "Anita Ma'am", an interactive AI mentor that guides students to answers using the Socratic method instead of just handing them solutions.
+* **Dynamic Mock Exams:** Time-bound, focus-locked assessments that adapt to foundational weaknesses and log real-time analytics.
+* **Loophole Diagnostics:** AI automatically identifies conceptual gaps from past mistakes and prescribes targeted flashcards and review materials.
+
+### 👨‍🏫 For Teachers
+* **Predictive Gap Analysis:** A cohort-level dashboard mapping out class-wide misconceptions and proficiency projections.
+* **Knowledge Heatmaps:** Visualizes student mastery and pinpoints the exact foundational topics where the class struggles.
+* **Bulk Assessment:** AI-assisted grading and data aggregation to eliminate administrative overhead.
+
+### 👨‍👩‍👧 For Parents
+* **Automated Weekly Reports:** Instant updates on student progress, streak monitoring, and latest mock exam scores.
+* **Digestible Insights:** Actionable, WhatsApp-style report cards ensuring parents are always in the loop without feeling overwhelmed.
+
+---
+
+## 📸 Platform Walkthrough
+
+### 1. Unified Student Dashboard
+The central hub for navigating learning modules, diagnostics, and upcoming exams.
+![Home Page](./home_page.png)
+
+### 2. AI Teacher (Anita Ma'am)
+Voice-enabled, highly empathetic Socratic tutor that speaks multiple vernacular languages.
+![AI Teacher](./ai_teacher.png)
+
+### 3. Mock Exams Hub
+Students can select subjects and dive into rigorous, AI-generated practice tests.
+![Mock Exam Setup](./mock_exam.png)
+
+### 4. Active Exam Interface
+A clean, distraction-free environment tracking time, responses, and items marked for review.
+![Ongoing Exam](./mock_exam_ongoing.png)
+
+### 5. Teacher Analytics & Gap Analysis
+Real-time tracking of class performance, automatically highlighting "loopholes" in the cohort's understanding.
+![Teacher Analytics](./analysis.png)
+
+### 6. Parent Report Cards
+Weekly AI-generated summaries covering recent mock exam scores, study hours, and overall growth trajectory.
+![Parent Reports](./report_for_parents.png)
+
+---
+
+## ⚙️ Tech Stack
+
+* **Frontend:** Next.js (React), Tailwind CSS, Lucide Icons
+* **Backend:** Node.js, Express.js, TypeScript
+* **Database:** MongoDB (Mongoose)
+* **AI Integration:** LLM-powered pedagogical engines, Google TTS
+* **Deployment:** Vercel (Serverless Functions for Backend & Next.js Frontend)
+
+---
+
+## 🚀 Quick Start
 
 ### 1. Install Dependencies
 ```bash
-npm install
+bun install
+# or npm install / pnpm install
 ```
 
-### 2. Environment Setup (Optional)
-Copy `.env.example` to `.env` and configure your API keys (e.g., `GEMINI_API_KEY`, `PORT`):
+### 2. Configure Environment Variables
+Create a `.env.local` inside the `frontend/` directory and a `.env` inside the `backend/` directory using your database and API credentials.
+
+### 3. Run Development Servers
+Run the backend and frontend simultaneously in separate terminals:
+
+**Terminal 1 (Backend):**
 ```bash
-cp .env.example .env
+cd backend
+bun run dev
 ```
+
+**Terminal 2 (Frontend):**
+```bash
+cd frontend
+bun run dev
+```
+
+The app will be available at [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Running the Application
-
-### Option A: Recommended (Unified Full-Stack)
-Runs both the backend Express API and the Vite frontend with Hot Module Replacement in a single unified process on **port 3000**:
-```bash
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-### Option B: Separate Frontend & Backend
-
-#### Terminal 1 — Backend API (Port 3000):
-```bash
-npm run dev:server
-```
-
-#### Terminal 2 — Frontend Dev Server (Port 5173 with auto `/api` proxy):
-```bash
-npm run dev:frontend
-```
-Open [http://localhost:5173](http://localhost:5173) in your browser. Requests to `/api/*` will automatically proxy to `http://localhost:3000`.
-
----
-
-## Production Build & Start
-
-To build optimized assets for production deployment:
-```bash
-npm run build
-npm start
-```
-- `npm run build` compiles the frontend to `dist/` and bundles the backend with `esbuild`.
-- `npm start` serves the full-stack application on `http://localhost:3000`.
-
----
-
-## Available NPM Scripts
-
-| Command | Description |
-|---|---|
-| `npm run dev` | Run full-stack application (frontend + backend) on `http://localhost:3000` |
-| `npm run dev:server` | Run only the backend Express API server |
-| `npm run dev:frontend` | Run only the Vite frontend dev server with API proxy |
-| `npm run build` | Build both frontend and backend for production |
-| `npm run build:frontend`| Build only the frontend assets into `dist/` |
-| `npm run build:server`  | Bundle only the backend into `backend/server.js` |
-| `npm start` | Start the production server |
-| `npm run lint` | Typecheck TypeScript files across the codebase |
-| `npm run clean` | Clean up build artifacts |
+<div align="center">
+Made with ❤️ for education empowerment by <b>Pranav Nere</b> and <b>Swapnil Ingle</b>
+</div>
