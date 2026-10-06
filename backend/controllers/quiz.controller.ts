@@ -9,68 +9,8 @@ export const quizController = {
       
       let quiz = await QuizModel.findOne({ subjectId });
       
-      // Seed some dummy quizzes if not exist to make it a "real quiz" look for demo
       if (!quiz) {
-        if (subjectId === 'sci') {
-          quiz = await QuizModel.create({
-            subjectId: 'sci',
-            title: 'Science Mock Exam',
-            durationMinutes: 15,
-            questions: [
-              {
-                questionText: 'What is the powerhouse of the cell?',
-                options: ['Nucleus', 'Mitochondria', 'Ribosome', 'Endoplasmic Reticulum'],
-                correctAnswer: 'Mitochondria',
-                explanation: 'Mitochondria generate most of the chemical energy needed to power the cell.'
-              },
-              {
-                questionText: 'Which planet is known as the Red Planet?',
-                options: ['Earth', 'Mars', 'Jupiter', 'Saturn'],
-                correctAnswer: 'Mars',
-                explanation: 'Mars appears red due to iron oxide (rust) on its surface.'
-              },
-              {
-                questionText: 'What gas do plants absorb from the atmosphere?',
-                options: ['Oxygen', 'Carbon Dioxide', 'Nitrogen', 'Hydrogen'],
-                correctAnswer: 'Carbon Dioxide',
-                explanation: 'Plants use carbon dioxide for photosynthesis.'
-              }
-            ]
-          });
-        } else if (subjectId === 'math') {
-          quiz = await QuizModel.create({
-            subjectId: 'math',
-            title: 'Mathematics Mock Exam',
-            durationMinutes: 15,
-            questions: [
-              {
-                questionText: 'What is 15% of 200?',
-                options: ['15', '20', '30', '35'],
-                correctAnswer: '30',
-                explanation: '(15/100) * 200 = 30'
-              },
-              {
-                questionText: 'If 3x = 12, what is the value of x?',
-                options: ['2', '3', '4', '6'],
-                correctAnswer: '4',
-                explanation: 'Divide both sides by 3.'
-              }
-            ]
-          });
-        } else {
-          quiz = await QuizModel.create({
-            subjectId,
-            title: `${subjectId.toUpperCase()} Mock Exam`,
-            durationMinutes: 10,
-            questions: [
-              {
-                questionText: 'Sample Question 1',
-                options: ['Option A', 'Option B', 'Option C', 'Option D'],
-                correctAnswer: 'Option A'
-              }
-            ]
-          });
-        }
+        return res.status(404).json({ error: 'Quiz not found' });
       }
 
       // Hide correct answers from the client if needed, or send them if the frontend handles validation

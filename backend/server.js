@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 import http from "node:http";
 import path2 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
-import mongoose3 from "mongoose";
+import mongoose4 from "mongoose";
 
 // backend/config/env.ts
 import dotenv from "dotenv";
@@ -29,7 +29,7 @@ var config = {
 };
 
 // backend/routes/index.ts
-import { Router as Router4 } from "express";
+import { Router as Router5 } from "express";
 
 // backend/routes/auth.routes.ts
 import { Router } from "express";
@@ -958,14 +958,124 @@ router3.post("/save-record", awsController.saveRecord);
 router3.post("/sync", awsController.syncData);
 var aws_routes_default = router3;
 
-// backend/routes/index.ts
+// backend/routes/quiz.routes.ts
+import { Router as Router4 } from "express";
+
+// backend/models/quiz.model.ts
+import mongoose3, { Schema as Schema3 } from "mongoose";
+var QuestionSchema = new Schema3({
+  questionText: { type: String, required: true },
+  options: [{ type: String, required: true }],
+  correctAnswer: { type: String, required: true },
+  explanation: { type: String },
+  imageUrl: { type: String }
+});
+var QuizSchema = new Schema3({
+  subjectId: { type: String, required: true, unique: true },
+  title: { type: String, required: true },
+  durationMinutes: { type: Number, required: true },
+  questions: [QuestionSchema]
+});
+var QuizModel = mongoose3.models.Quiz || mongoose3.model("Quiz", QuizSchema);
+var ExamAttemptSchema = new Schema3({
+  userId: { type: String, required: true },
+  subjectId: { type: String, required: true },
+  score: { type: Number, required: true },
+  totalQuestions: { type: Number, required: true },
+  answers: [{
+    questionIndex: { type: Number, required: true },
+    selectedOption: { type: String, required: true },
+    isCorrect: { type: Boolean, required: true }
+  }],
+  completedAt: { type: Date, default: Date.now }
+});
+var ExamAttemptModel = mongoose3.models.ExamAttempt || mongoose3.model("ExamAttempt", ExamAttemptSchema);
+
+// backend/controllers/quiz.controller.ts
+var quizController = {
+  async getQuiz(req, res) {
+    try {
+      const { subjectId } = req.params;
+      let quiz = await QuizModel.findOne({ subjectId });
+      if (!quiz) {
+        return res.status(404).json({ error: "Quiz not found" });
+      }
+      return res.json(quiz);
+    } catch (err) {
+      console.error("getQuiz error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+  async submitAttempt(req, res) {
+    try {
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return res.status(401).json({ error: "Unauthenticated" });
+      }
+      const { subjectId } = req.params;
+      const { answers } = req.body;
+      const quiz = await QuizModel.findOne({ subjectId });
+      if (!quiz) {
+        return res.status(404).json({ error: "Quiz not found" });
+      }
+      let score = 0;
+      const evaluatedAnswers = answers.map((ans) => {
+        const question = quiz.questions[ans.questionIndex];
+        const isCorrect = question.correctAnswer === ans.selectedOption;
+        if (isCorrect) score++;
+        return {
+          questionIndex: ans.questionIndex,
+          selectedOption: ans.selectedOption,
+          isCorrect
+        };
+      });
+      const attempt = await ExamAttemptModel.create({
+        userId: user.id,
+        subjectId,
+        score,
+        totalQuestions: quiz.questions.length,
+        answers: evaluatedAnswers
+      });
+      return res.status(201).json(attempt);
+    } catch (err) {
+      console.error("submitAttempt error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+  async getReports(req, res) {
+    try {
+      const user = await getAuthenticatedUser(req);
+      if (!user) return res.status(401).json({ error: "Unauthenticated" });
+      let targetUserId = user.id;
+      if ((user.role === "teacher" || user.role === "parent") && req.query.studentId) {
+        targetUserId = req.query.studentId;
+      }
+      const attempts = await ExamAttemptModel.find({ userId: targetUserId }).sort({ completedAt: -1 });
+      return res.json(attempts);
+    } catch (err) {
+      console.error("getReports error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+};
+
+// backend/routes/quiz.routes.ts
 var router4 = Router4();
-router4.use("/auth", auth_routes_default);
-router4.use("/ai", ai_routes_default);
-router4.use("/aws", aws_routes_default);
-var routes_default = router4;
+router4.get("/:subjectId", quizController.getQuiz);
+router4.post("/:subjectId/submit", quizController.submitAttempt);
+router4.get("/reports/all", quizController.getReports);
+var quiz_routes_default = router4;
+
+// backend/routes/index.ts
+var router5 = Router5();
+router5.use("/auth", auth_routes_default);
+router5.use("/ai", ai_routes_default);
+router5.use("/aws", aws_routes_default);
+router5.use("/quiz", quiz_routes_default);
+var routes_default = router5;
 
 // backend/server.ts
+mongoose4.set("bufferCommands", false);
 var __filename2 = fileURLToPath2(import.meta.url);
 var __dirname2 = path2.dirname(__filename2);
 var app = express();
@@ -994,7 +1104,7 @@ async function startServer() {
     });
   }
   try {
-    await mongoose3.connect(config.mongoUri);
+    await mongoose4.connect(config.mongoUri);
     console.log("[Shiksha Mitra AI] Connected to MongoDB");
   } catch (error) {
     console.error("[Shiksha Mitra AI] MongoDB connection error:", error);

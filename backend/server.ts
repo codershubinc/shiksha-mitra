@@ -5,6 +5,9 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
+
+mongoose.set('bufferCommands', false);
+
 import { config } from './config/env.js';
 import apiRoutes from './routes/index.js';
 

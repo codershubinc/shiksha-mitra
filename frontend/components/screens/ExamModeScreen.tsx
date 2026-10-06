@@ -1,185 +1,89 @@
 "use client";
+
 import React, { useState, useEffect } from 'react';
-import { Card } from '../ui/card';
-import { Button } from '../ui/button';
-import { Dialog } from '../ui/dialog';
-import { MarkdownRenderer } from '../ui/MarkdownRenderer';
+import { 
+  ChevronLeft, BookOpen, AlertTriangle, Lightbulb, Hexagon, Fingerprint, Lock, 
+  ChevronRight, BrainCircuit, XCircle, CheckCircle2, ChevronRightSquare, ShieldCheck, 
+  ZoomIn, Activity, Calculator, Beaker, Globe, Atom, BookMarked, Brain, Orbit 
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
-import {
-  ShieldCheck,
-  Timer,
-  ZoomIn,
-  Sparkles,
-  AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  Bookmark,
-  CheckCircle2,
-  FlaskConical,
-  Calculator,
-  Leaf,
-  Landmark,
-  BookOpen,
-} from 'lucide-react';
+
+const mockSubjects = [
+  {
+    id: 'sci',
+    name: 'Science & Cosmos',
+    code: 'SCI-801',
+    icon: Atom,
+    color: 'from-blue-500 to-indigo-600',
+    totalQuestions: 15,
+    durationMinutes: 15,
+    completedPercent: 0,
+  },
+  {
+    id: 'math',
+    name: 'Advanced Mathematics',
+    code: 'MTH-802',
+    icon: Calculator,
+    color: 'from-emerald-500 to-teal-600',
+    totalQuestions: 20,
+    durationMinutes: 20,
+    completedPercent: 0,
+  },
+  {
+    id: 'hist',
+    name: 'World History',
+    code: 'HST-803',
+    icon: Globe,
+    color: 'from-amber-500 to-orange-600',
+    totalQuestions: 10,
+    durationMinutes: 10,
+    completedPercent: 0,
+  }
+];
 
 interface ExamModeScreenProps {
   onNavigate: (screen: any) => void;
 }
 
-interface SubjectMock {
-  id: string;
-  name: string;
-  code: string;
-  icon: any;
-  color: string;
-  totalQuestions: number;
-  durationMinutes: number;
-  completedPercent: number;
-  questionIndex: number;
-  questionPrompt: string;
-  imageUrl?: string;
-  imageAlt?: string;
-  options: { id: string; label: string; text: string }[];
-  correctOptionId: string;
-  socraticContext: string;
-}
-
-const mockSubjects: SubjectMock[] = [
-  {
-    id: 'science',
-    name: 'Science (Term 1)',
-    code: 'SCI-801',
-    icon: FlaskConical,
-    color: 'from-amber-500 to-orange-600',
-    totalQuestions: 20,
-    durationMinutes: 45,
-    completedPercent: 25,
-    questionIndex: 5,
-    questionPrompt:
-      'Observe the chemical reaction depicted in the diagram below. What is the primary gas evolved when solid Zinc granules react with dilute Hydrochloric Acid under these conditions?',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuA9bykSAVUFnzqf_35wlmUu_Yc2qAXxoItXR8iAp7zUhTTcdY_QJyjMvJjhRZhkq09N35EVFx--HS8pHKOQdo9luaNtFfqn_YwIa9ChhT74CvoqrJMxl7Re6MPnv0wFN6iPfVbwwc44rc26B5M9jW5Vx3KveBCUK1b04AwPQA7YgXcqj3HUY8NykcbwVDcziyyFyucoepLlRc0ceXlff6sQ5M4bAm9ecaH1nwQIHBpgYoBMlWi0dQgu',
-    imageAlt: 'Chemical apparatus with zinc granules and dilute hydrochloric acid producing bubbles in water trough',
-    options: [
-      { id: 'a', label: 'A', text: 'Oxygen (O₂)' },
-      { id: 'b', label: 'B', text: 'Hydrogen (H₂)' },
-      { id: 'c', label: 'C', text: 'Carbon Dioxide (CO₂)' },
-      { id: 'd', label: 'D', text: 'Chlorine (Cl₂)' },
-    ],
-    correctOptionId: 'b',
-    socraticContext: 'Observe metal + dilute acid displacement forming diatomic gas bubbles.',
-  },
-  {
-    id: 'math',
-    name: 'Mathematics (Term 1)',
-    code: 'MTH-802',
-    icon: Calculator,
-    color: 'from-teal-500 to-cyan-600',
-    totalQuestions: 25,
-    durationMinutes: 60,
-    completedPercent: 40,
-    questionIndex: 10,
-    questionPrompt:
-      'Solve the following quadratic algebraic equation: 2x² + 5x = 0. Which of the following gives the complete and correct solution set for the real variable x?',
-    options: [
-      { id: 'a', label: 'A', text: 'x = 0 only' },
-      { id: 'b', label: 'B', text: 'x = 0 or x = -5/2' },
-      { id: 'c', label: 'C', text: 'x = 2 or x = 5' },
-      { id: 'd', label: 'D', text: 'x = -5 or x = 2' },
-    ],
-    correctOptionId: 'b',
-    socraticContext: 'Notice that both terms share a common factor x. Factor x(2x + 5) = 0.',
-  },
-  {
-    id: 'biology',
-    name: 'Biology & Living Organisms',
-    code: 'BIO-803',
-    icon: Leaf,
-    color: 'from-emerald-500 to-teal-600',
-    totalQuestions: 15,
-    durationMinutes: 30,
-    completedPercent: 60,
-    questionIndex: 8,
-    questionPrompt:
-      'Which specialized organelle in green plant cells contains chlorophyll and carries out the biochemical process of photosynthesis by converting solar photons into chemical glucose?',
-    options: [
-      { id: 'a', label: 'A', text: 'Mitochondria' },
-      { id: 'b', label: 'B', text: 'Chloroplast' },
-      { id: 'c', label: 'C', text: 'Endoplasmic Reticulum' },
-      { id: 'd', label: 'D', text: 'Golgi Apparatus' },
-    ],
-    correctOptionId: 'b',
-    socraticContext: 'Think of the green pigment that captures sunlight for food synthesis.',
-  },
-  {
-    id: 'social',
-    name: 'Social Studies & Civics',
-    code: 'SST-804',
-    icon: Landmark,
-    color: 'from-indigo-500 to-purple-600',
-    totalQuestions: 20,
-    durationMinutes: 40,
-    completedPercent: 15,
-    questionIndex: 3,
-    questionPrompt:
-      'Under the Indian Constitution, which article is widely regarded as the fundamental safeguard guaranteeing the "Right to Equality" before law to all citizens?',
-    options: [
-      { id: 'a', label: 'A', text: 'Article 14' },
-      { id: 'b', label: 'B', text: 'Article 21' },
-      { id: 'c', label: 'C', text: 'Article 32' },
-      { id: 'd', label: 'D', text: 'Article 45' },
-    ],
-    correctOptionId: 'a',
-    socraticContext: 'Equality before law is the cornerstone of fundamental rights in Part III.',
-  },
-  {
-    id: 'languages',
-    name: 'English & Vernacular Grammar',
-    code: 'ENG-805',
-    icon: BookOpen,
-    color: 'from-rose-500 to-pink-600',
-    totalQuestions: 15,
-    durationMinutes: 30,
-    completedPercent: 80,
-    questionIndex: 12,
-    questionPrompt:
-      'Identify the passive voice transformation for the sentence: "The rural farmers installed solar water pumps across the village fields."',
-    options: [
-      { id: 'a', label: 'A', text: 'Solar water pumps had installed by the rural farmers.' },
-      { id: 'b', label: 'B', text: 'Solar water pumps were installed by the rural farmers across the village fields.' },
-      { id: 'c', label: 'C', text: 'Solar water pumps are being installed by the rural farmers.' },
-      { id: 'd', label: 'D', text: 'Across the village fields, solar water pumps install the rural farmers.' },
-    ],
-    correctOptionId: 'b',
-    socraticContext: 'Past tense simple (installed) transforms into (were + past participle installed).',
-  },
-];
-
 export function ExamModeScreen({ onNavigate }: ExamModeScreenProps) {
   const { user, updateUserXp } = useAuth();
-
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(mockSubjects[0].id);
   const [isSelectingSubject, setIsSelectingSubject] = useState<boolean>(true);
-  const [selectedOption, setSelectedOption] = useState<string>('');
-  const [markedForReview, setMarkedForReview] = useState<boolean>(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
-  const [imageZoomOpen, setImageZoomOpen] = useState<boolean>(false);
+  
+  const [quizData, setQuizData] = useState<any>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<{ [key: number]: string }>({});
+  
+  const [markedForReview, setMarkedForReview] = useState<{ [key: number]: boolean }>({});
   const [hintModalOpen, setHintModalOpen] = useState<boolean>(false);
   const [hintLoading, setHintLoading] = useState<boolean>(false);
   const [hintText, setHintText] = useState<string>('');
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [examResult, setExamResult] = useState<any>(null);
 
   const currentSubject = mockSubjects.find((s) => s.id === selectedSubjectId) || mockSubjects[0];
 
   useEffect(() => {
     let interval: any;
-    if (!isSelectingSubject && secondsRemaining > 0) {
+    if (!isSelectingSubject && !examResult && secondsRemaining > 0) {
       interval = setInterval(() => {
-        setSecondsRemaining((prev) => (prev > 0 ? prev - 1 : 0));
+        setSecondsRemaining((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            handleSubmitExam();
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isSelectingSubject, secondsRemaining]);
+  }, [isSelectingSubject, secondsRemaining, examResult]);
 
   const formatTimer = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -187,30 +91,92 @@ export function ExamModeScreen({ onNavigate }: ExamModeScreenProps) {
     return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleStartExam = (subjectId: string) => {
+  const loadQuiz = async (subjectId: string) => {
+    try {
+      const data = await api.getQuiz(subjectId);
+      setQuizData(data);
+      setSecondsRemaining(data.durationMinutes * 60);
+    } catch (e) {
+      console.error(e);
+      // fallback to some defaults if failed
+    }
+  };
+
+  const handleStartExam = async (subjectId: string) => {
     const subject = mockSubjects.find(s => s.id === subjectId);
     if (subject) {
       setSelectedSubjectId(subjectId);
-      setSecondsRemaining(subject.durationMinutes * 60);
-      setSelectedOption('');
-      setMarkedForReview(false);
-      setHintText('');
       setIsSelectingSubject(false);
+      setExamResult(null);
+      setCurrentQuestionIndex(0);
+      setAnswers({});
+      setMarkedForReview({});
+      setHintText('');
+      await loadQuiz(subjectId);
+    }
+  };
+
+  const handleSelectOption = (option: string) => {
+    setAnswers(prev => ({ ...prev, [currentQuestionIndex]: option }));
+  };
+
+  const handleToggleReview = () => {
+    setMarkedForReview(prev => ({
+      ...prev,
+      [currentQuestionIndex]: !prev[currentQuestionIndex]
+    }));
+  };
+
+  const handleNext = () => {
+    if (quizData && currentQuestionIndex < quizData.questions.length - 1) {
+      setCurrentQuestionIndex(curr => curr + 1);
+      setHintText('');
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(curr => curr - 1);
+      setHintText('');
+    }
+  };
+
+  const handleSubmitExam = async () => {
+    if (!quizData || isSubmitting) return;
+    setIsSubmitting(true);
+    
+    const formattedAnswers = Object.keys(answers).map(key => ({
+      questionIndex: parseInt(key, 10),
+      selectedOption: answers[parseInt(key, 10)]
+    }));
+
+    try {
+      const result = await api.submitQuizAttempt(selectedSubjectId, formattedAnswers);
+      setExamResult(result);
+      if (user) {
+        // Add XP based on score
+        updateUserXp(result.score * 50);
+      }
+    } catch (e) {
+      console.error('Failed to submit exam', e);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleAskHint = async () => {
     if (user) updateUserXp(-10);
     setHintModalOpen(true);
-    if (!hintText) {
+    if (!hintText && quizData) {
       setHintLoading(true);
       try {
+        const currentQ = quizData.questions[currentQuestionIndex];
         const res = await api.getSocraticHint({
-          question: currentSubject.questionPrompt,
+          question: currentQ.questionText,
         });
-        setHintText(res.hint || currentSubject.socraticContext);
+        setHintText(res.hint || "Think about the key concepts mentioned in the question.");
       } catch (e) {
-        setHintText(currentSubject.socraticContext);
+        setHintText("Think about the key concepts mentioned in the question.");
       } finally {
         setHintLoading(false);
       }
@@ -258,15 +224,15 @@ export function ExamModeScreen({ onNavigate }: ExamModeScreenProps) {
                 
                 <div className="flex items-center gap-4 text-xs font-medium text-slate-400 mb-6">
                   <span className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> {sub.totalQuestions} Questions</span>
-                  <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5" /> {sub.durationMinutes} Mins</span>
+                  <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> {sub.durationMinutes} mins</span>
                 </div>
 
                 <div className="mt-auto">
-                  <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                    <span>Previous Progress</span>
+                  <div className="flex justify-between text-xs font-medium text-slate-300 mb-2">
+                    <span>Mastery Progress</span>
                     <span className="text-amber-400">{sub.completedPercent}%</span>
                   </div>
-                  <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500" style={{ width: `${sub.completedPercent}%` }} />
                   </div>
                 </div>
@@ -278,220 +244,228 @@ export function ExamModeScreen({ onNavigate }: ExamModeScreenProps) {
     );
   }
 
+  if (examResult) {
+    return (
+      <div className="flex flex-col py-10 px-4 max-w-2xl mx-auto w-full items-center text-center">
+        <CheckCircle2 className="w-20 h-20 text-emerald-400 mb-6" />
+        <h2 className="text-3xl font-bold text-white mb-2">Exam Completed!</h2>
+        <p className="text-slate-300 mb-8">You scored {examResult.score} out of {examResult.totalQuestions}.</p>
+        
+        <div className="flex gap-4">
+          <Button variant="primary" onClick={() => onNavigate('post-scan-growth')}>
+            View Detailed Analysis
+          </Button>
+          <Button variant="outline" onClick={() => setIsSelectingSubject(true)}>
+            Back to Subjects
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!quizData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-slate-300">
+        Loading exam data...
+      </div>
+    );
+  }
+
+  const currentQuestion = quizData.questions[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex === quizData.questions.length - 1;
+
   return (
     <div className="flex flex-col py-4 px-4 max-w-4xl mx-auto w-full">
       {/* Top Locked Exam Header */}
       <div className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-xl border-b border-white/10 px-4 md:px-8 py-3 flex justify-between items-center h-16 shadow-lg mb-6 rounded-2xl">
-        {/* Focus Lock Pill */}
         <div className="flex items-center gap-2 bg-teal-500/10 border border-teal-500/30 px-3.5 py-1.5 rounded-full">
-          <div className="relative flex items-center justify-center">
-            <span className="material-symbols-outlined text-teal-400 fill text-[18px] relative z-10">
-              shield_lock
-            </span>
-            <span className="absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-30 animate-ping" />
-          </div>
-          <span className="text-xs font-semibold text-teal-200 hidden sm:inline tracking-wide">
+          <ShieldCheck className="w-4 h-4 text-teal-400" />
+          <span className="text-teal-400 text-xs font-bold uppercase tracking-wider font-mono">
             Focus Lock Active
           </span>
         </div>
-
-        {/* Exam Title (Middle) */}
-        <h1 className="font-headline text-sm md:text-base font-bold text-white truncate text-center absolute left-1/2 -translate-x-1/2 max-w-[45%]">
-          Class 8 {currentSubject.name} Mock
-        </h1>
-
-        {/* Countdown Timer */}
-        <div className="flex items-center gap-2 bg-rose-500/15 border border-rose-500/30 text-rose-300 px-3.5 py-1.5 rounded-full shadow-inner">
-          <Timer className="w-4 h-4 text-rose-400" />
-          <span className="font-headline font-bold text-sm md:text-base tabular-nums tracking-tight">
-            {formatTimer(secondsRemaining)}
-          </span>
-        </div>
-      </div>
-
-      {/* Progress Track for Active Exam */}
-      <section className="flex flex-col gap-2 mb-6">
-        <div className="flex justify-between items-end">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Question {currentSubject.questionIndex} of {currentSubject.totalQuestions}
-          </h2>
-          <span className="text-xs font-semibold text-teal-400">
-            {currentSubject.completedPercent}% Completed
-          </span>
-        </div>
-        <div className="h-2.5 w-full bg-slate-900 rounded-full overflow-hidden border border-white/5">
-          <div
-            className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-500"
-            style={{ width: `${currentSubject.completedPercent}%` }}
-          />
-        </div>
-      </section>
-
-      {/* Main Question Card */}
-      <Card className="glass-card mb-6 border-white/10 shadow-2xl relative">
-        {/* Accent top gradient stripe */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-teal-500" />
-
-        {/* Question Text */}
-        <p className="font-body text-base md:text-lg text-slate-100 font-medium leading-relaxed mb-5">
-          {currentSubject.questionPrompt}
-        </p>
-
-        {/* Optional Diagram Box (e.g. Science) */}
-        {currentSubject.imageUrl && (
-          <div className="relative group w-full rounded-2xl overflow-hidden border border-white/10 bg-slate-950/60 flex items-center justify-center h-60 md:h-80 mb-6">
-            <img
-              src={currentSubject.imageUrl}
-              alt={currentSubject.imageAlt || 'Subject Diagram'}
-              className="w-full h-full object-contain p-4 group-hover:scale-102 transition-transform duration-300"
-            />
-            <button
-              onClick={() => setImageZoomOpen(true)}
-              className="absolute bottom-3 right-3 p-2 rounded-xl bg-slate-900/80 backdrop-blur-md border border-white/15 text-slate-300 hover:text-white hover:border-amber-500/50 transition-all opacity-80 group-hover:opacity-100"
-              title="Expand Diagram"
-            >
-              <ZoomIn className="w-5 h-5" />
-            </button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-amber-500 animate-pulse" />
+            <span className="font-mono text-xl font-bold text-white tracking-wider">
+              {formatTimer(secondsRemaining)}
+            </span>
           </div>
-        )}
-
-        {/* Multiple Choice Radio List */}
-        <div className="space-y-3" role="radiogroup">
-          {currentSubject.options.map((opt) => {
-            const isSelected = selectedOption === opt.id;
-            return (
-              <label
-                key={opt.id}
-                onClick={() => setSelectedOption(opt.id)}
-                className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
-                  isSelected
-                    ? 'border-amber-500 bg-amber-500/15 shadow-[0_0_20px_rgba(245,158,11,0.15)] text-white'
-                    : 'border-white/5 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:bg-slate-950/60'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="quiz_answer"
-                  value={opt.id}
-                  checked={isSelected}
-                  onChange={() => setSelectedOption(opt.id)}
-                  className="sr-only"
-                />
-                <div
-                  className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center transition-colors ${
-                    isSelected ? 'border-amber-400 bg-amber-500' : 'border-slate-600'
-                  }`}
-                >
-                  {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-slate-950" />}
-                </div>
-                <span className="text-sm md:text-base font-medium">{opt.text}</span>
-              </label>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Socratic Hint Button */}
-      <div className="flex justify-center mb-6">
-        <button
-          onClick={handleAskHint}
-          className="flex items-center gap-2.5 px-6 py-3 rounded-full border-2 border-teal-500/40 bg-teal-950/30 text-teal-300 hover:bg-teal-900/40 hover:border-teal-400 transition-all text-sm font-semibold shadow-lg shadow-teal-950/40 cursor-pointer"
-        >
-          <Sparkles className="w-4 h-4 text-teal-400 animate-pulse" />
-          <span>Ask Socratic Hint</span>
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-500/20 text-teal-200 border border-teal-500/30">
-            Costs 10 XP
-          </span>
-        </button>
-      </div>
-
-      {/* Focus Mode Enforced Banner */}
-      <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/30 flex items-start gap-3 text-rose-200 text-xs md:text-sm">
-        <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-        <div>
-          <div className="font-bold text-rose-300 mb-0.5">Focus Mode Enforced</div>
-          <p className="opacity-90 leading-relaxed text-xs">
-            Leaving or switching apps will flag distraction time on your parent's weekly WhatsApp
-            report. Stay focused!
-          </p>
-        </div>
-      </div>
-
-      {/* Bottom Action Footer */}
-      <footer className="sticky bottom-0 z-40 w-full bg-slate-950/90 backdrop-blur-xl border border-white/10 px-4 md:px-8 py-3.5 flex justify-between items-center rounded-2xl shadow-2xl mt-6">
-        <Button
-          variant="outline"
-          size="md"
-          className="gap-1.5"
-          onClick={() => onNavigate('dashboard')}
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span className="hidden sm:inline">Dashboard</span>
-        </Button>
-
-        <button
-          onClick={() => setMarkedForReview(!markedForReview)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all ${
-            markedForReview
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-              : 'text-slate-300 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <Bookmark className={`w-4 h-4 ${markedForReview ? 'fill-amber-400' : ''}`} />
-          <span>{markedForReview ? 'Marked' : 'Mark for Review'}</span>
-        </button>
-
-        <Button
-          variant="primary"
-          size="md"
-          glow
-          className="gap-2 px-6"
-          onClick={() => onNavigate('post-scan-growth')}
-        >
-          <span>Next / Evaluate</span>
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </footer>
-
-      {/* Hint Dialog */}
-      <Dialog
-        open={hintModalOpen}
-        onOpenChange={setHintModalOpen}
-        title="Socratic Guidance"
-        description="A gentle nudge to spark your reasoning without spoiling the solution."
-      >
-        <div className="p-4 rounded-2xl bg-slate-950/80 border border-teal-500/30 text-teal-100 text-sm leading-relaxed space-y-3">
-          {hintLoading ? (
-            <div className="flex items-center justify-center py-6 gap-3 text-slate-300">
-              <span className="w-5 h-5 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
-              <span>Generating Socratic hint with Gemini AI...</span>
-            </div>
-          ) : (
-            <MarkdownRenderer content={hintText} />
-          )}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => setHintModalOpen(false)}>
-            Got it, thanks!
+          <Button variant="outline" size="sm" className="hidden sm:flex border-rose-500/30 text-rose-400 hover:bg-rose-500/10" onClick={() => setIsSelectingSubject(true)}>
+            <XCircle className="w-4 h-4 mr-1.5" /> End Exam
           </Button>
         </div>
-      </Dialog>
+      </div>
 
-      {/* Diagram Zoom Dialog */}
-      {currentSubject.imageUrl && (
-        <Dialog
-          open={imageZoomOpen}
-          onOpenChange={setImageZoomOpen}
-          title={`${currentSubject.name} Diagram View`}
-        >
-          <div className="p-2 bg-slate-950 rounded-2xl border border-white/10 flex items-center justify-center">
-            <img
-              src={currentSubject.imageUrl}
-              alt={currentSubject.imageAlt || 'Diagram'}
-              className="w-full h-auto object-contain max-h-[70vh]"
-            />
-          </div>
-        </Dialog>
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main Exam Area */}
+        <div className="flex-1">
+          <Card className="glass-card p-6 md:p-8 border-white/10 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full pointer-events-none" />
+            
+            <div className="flex justify-between items-start mb-6">
+              <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-medium text-slate-300">
+                Question {currentQuestionIndex + 1} of {quizData.questions.length}
+              </span>
+              <button 
+                onClick={handleToggleReview}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${markedForReview[currentQuestionIndex] ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/5 text-slate-400 border border-transparent hover:bg-white/10'}`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {markedForReview[currentQuestionIndex] ? 'Marked for Review' : 'Mark for Review'}
+              </button>
+            </div>
+
+            <div className="mb-8">
+              <h2 className="text-xl md:text-2xl font-semibold text-white leading-relaxed font-headline">
+                {currentQuestion.questionText}
+              </h2>
+            </div>
+
+            <div className="space-y-3 mb-8">
+              {currentQuestion.options.map((option: string, idx: number) => {
+                const isSelected = answers[currentQuestionIndex] === option;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleSelectOption(option)}
+                    className={`w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-center gap-4 ${
+                      isSelected 
+                        ? 'bg-amber-500/10 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.1)]' 
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      isSelected ? 'border-amber-500 bg-amber-500' : 'border-slate-500'
+                    }`}>
+                      {isSelected && <div className="w-2 h-2 rounded-full bg-slate-900" />}
+                    </div>
+                    <span className={`text-sm md:text-base ${isSelected ? 'text-amber-100 font-medium' : 'text-slate-300'}`}>
+                      {option}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="flex items-center justify-between pt-6 border-t border-white/10">
+              <Button 
+                variant="outline" 
+                onClick={handleAskHint}
+                className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+              >
+                <Lightbulb className="w-4 h-4 mr-2" />
+                Ask Mitra (Costs 10 XP)
+              </Button>
+              
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={handlePrev} disabled={currentQuestionIndex === 0}>
+                  Previous
+                </Button>
+                {isLastQuestion ? (
+                  <Button variant="primary" onClick={handleSubmitExam} disabled={isSubmitting}>
+                    {isSubmitting ? 'Submitting...' : 'Submit Exam'}
+                  </Button>
+                ) : (
+                  <Button variant="primary" onClick={handleNext}>
+                    Next <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
+        
+        {/* Sidebar / Question Palette */}
+        <div className="w-full lg:w-72 shrink-0">
+          <Card className="glass-card p-5 border-white/10 h-full">
+            <h3 className="font-headline font-semibold text-white mb-4 flex items-center gap-2">
+              <Hexagon className="w-4 h-4 text-amber-500" /> Question Palette
+            </h3>
+            
+            <div className="grid grid-cols-5 gap-2">
+              {quizData.questions.map((_: any, idx: number) => {
+                const isAnswered = !!answers[idx];
+                const isMarked = markedForReview[idx];
+                const isCurrent = currentQuestionIndex === idx;
+                
+                let bgClass = 'bg-white/5 text-slate-400 border-white/10';
+                if (isCurrent) bgClass = 'bg-white/20 text-white border-white/40 shadow-inner';
+                else if (isMarked) bgClass = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+                else if (isAnswered) bgClass = 'bg-teal-500/20 text-teal-400 border-teal-500/30';
+                
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setCurrentQuestionIndex(idx);
+                      setHintText('');
+                    }}
+                    className={`w-full aspect-square rounded-lg flex items-center justify-center text-xs font-bold border transition-colors ${bgClass}`}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="mt-8 space-y-3 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-sm bg-teal-500/20 border border-teal-500/30" />
+                Answered
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-sm bg-amber-500/20 border border-amber-500/30" />
+                Marked for Review
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-sm bg-white/5 border border-white/10" />
+                Unanswered
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Hint Modal Overlay */}
+      {hintModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <Card className="glass-card max-w-md w-full p-6 border-amber-500/30 shadow-[0_0_50px_rgba(245,158,11,0.15)] relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-bl-full pointer-events-none" />
+            <div className="flex justify-between items-start mb-4 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 p-[2px]">
+                  <div className="w-full h-full bg-slate-900 rounded-full flex items-center justify-center">
+                    <BrainCircuit className="w-5 h-5 text-amber-400" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-headline font-bold text-white">Shiksha Mitra</h3>
+                  <p className="text-xs text-amber-400/80">Socratic Guide</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setHintModalOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="bg-slate-900/50 rounded-xl p-4 border border-white/5 relative z-10 min-h-[100px] flex items-center">
+              {hintLoading ? (
+                <div className="flex items-center gap-3 text-slate-400">
+                  <div className="w-4 h-4 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                  Analyzing the question context...
+                </div>
+              ) : (
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  {hintText}
+                </p>
+              )}
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );
