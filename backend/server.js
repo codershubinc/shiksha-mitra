@@ -1,16 +1,22 @@
 // backend/server.ts
 import express from "express";
+import cors from "cors";
 import cookieParser from "cookie-parser";
 import http from "node:http";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import path2 from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+import mongoose3 from "mongoose";
 
 // backend/config/env.ts
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 dotenv.config();
 var config = {
-  port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3e3,
+  port: process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT, 10) : 3e3,
   nodeEnv: process.env.NODE_ENV || "development",
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   aws: {
@@ -18,7 +24,8 @@ var config = {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
     tableName: process.env.DYNAMODB_TABLE_NAME || "ShikshaMitra-Records"
-  }
+  },
+  mongoUri: process.env.MONGODB_URI || "mongodb://localhost:27017/shiksha-mitra"
 };
 
 // backend/routes/index.ts
@@ -27,17 +34,8 @@ import { Router as Router4 } from "express";
 // backend/routes/auth.routes.ts
 import { Router } from "express";
 
-// backend/models/user.model.ts
-import crypto2 from "node:crypto";
-
 // backend/utils/crypto.utils.ts
 import crypto from "node:crypto";
-function hashPassword(password, salt) {
-  return crypto.scryptSync(password, salt, 64).toString("hex");
-}
-function generateSalt() {
-  return crypto.randomBytes(16).toString("hex");
-}
 function generateToken() {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -46,18 +44,134 @@ function sanitizeUser(user) {
   return safeUser;
 }
 
+// backend/services/cognito.service.ts
+import {
+  CognitoIdentityProviderClient,
+  SignUpCommand,
+  InitiateAuthCommand,
+  AdminUpdateUserAttributesCommand,
+  AdminConfirmSignUpCommand,
+  GetUserCommand
+} from "@aws-sdk/client-cognito-identity-provider";
+import crypto2 from "node:crypto";
+var cognitoClient = new CognitoIdentityProviderClient({
+  region: config.aws.region,
+  credentials: {
+    accessKeyId: config.aws.accessKeyId,
+    secretAccessKey: config.aws.secretAccessKey
+  }
+});
+var CLIENT_ID = process.env.COGNITO_CLIENT_ID || "dummy_client_id";
+var USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || "dummy_pool_id";
+var CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET || "";
+function getSecretHash(username) {
+  if (!CLIENT_SECRET) return void 0;
+  return crypto2.createHmac("sha256", CLIENT_SECRET).update(username + CLIENT_ID).digest("base64");
+}
+var cognitoService = {
+  async signUp(email, password, name, role) {
+    const username = crypto2.randomUUID();
+    const command = new SignUpCommand({
+      ClientId: CLIENT_ID,
+      SecretHash: getSecretHash(username),
+      Username: username,
+      Password: password,
+      UserAttributes: [
+        { Name: "email", Value: email },
+        { Name: "name", Value: name },
+        { Name: "custom:role", Value: role }
+      ]
+    });
+    const response = await cognitoClient.send(command);
+    if (USER_POOL_ID) {
+      try {
+        await cognitoClient.send(new AdminConfirmSignUpCommand({
+          UserPoolId: USER_POOL_ID,
+          Username: username
+        }));
+      } catch (err) {
+        console.warn("Auto-confirm failed:", err.message);
+      }
+    }
+    return response.UserSub;
+  },
+  async signIn(email, password) {
+    const command = new InitiateAuthCommand({
+      AuthFlow: "USER_PASSWORD_AUTH",
+      ClientId: CLIENT_ID,
+      AuthParameters: {
+        USERNAME: email,
+        PASSWORD: password,
+        ...getSecretHash(email) ? { SECRET_HASH: getSecretHash(email) } : {}
+      }
+    });
+    const response = await cognitoClient.send(command);
+    return response.AuthenticationResult;
+  },
+  async linkParentToStudent(parentEmail, studentEmail) {
+    const command = new AdminUpdateUserAttributesCommand({
+      UserPoolId: USER_POOL_ID,
+      Username: parentEmail,
+      UserAttributes: [
+        { Name: "custom:linked_student", Value: studentEmail }
+      ]
+    });
+    return await cognitoClient.send(command);
+  },
+  async getUser(accessToken) {
+    const command = new GetUserCommand({
+      AccessToken: accessToken
+    });
+    const response = await cognitoClient.send(command);
+    const attrs = {};
+    if (response.UserAttributes) {
+      for (const attr of response.UserAttributes) {
+        if (attr.Name && attr.Value) {
+          attrs[attr.Name] = attr.Value;
+        }
+      }
+    }
+    return attrs;
+  }
+};
+
 // backend/models/user.model.ts
-var usersDb = /* @__PURE__ */ new Map();
-var sessions = /* @__PURE__ */ new Map();
-function createUserRecord(name, email, pass, role, grade = "Class 8", rollNo, avatar, streak = 7, xp = 450) {
-  const salt = generateSalt();
-  const passwordHash = hashPassword(pass, salt);
-  const user = {
-    id: `usr_${crypto2.randomUUID().slice(0, 8)}`,
+import mongoose, { Schema } from "mongoose";
+var UserSchema = new Schema({
+  id: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  role: { type: String, required: true, enum: ["student", "teacher", "parent"] },
+  grade: { type: String },
+  rollNo: { type: String },
+  streakDays: { type: Number, default: 0 },
+  xp: { type: Number, default: 0 },
+  avatarUrl: { type: String },
+  language: { type: String, enum: ["EN", "HI", "MR"], default: "EN" },
+  createdAt: { type: String, required: true },
+  studentIds: [{ type: String }],
+  parentIds: [{ type: String }]
+});
+var UserModel = mongoose.models.User || mongoose.model("User", UserSchema);
+
+// backend/models/session.model.ts
+import mongoose2, { Schema as Schema2 } from "mongoose";
+var SessionSchema = new Schema2({
+  token: { type: String, required: true, unique: true },
+  userId: { type: String, required: true },
+  expiresAt: { type: Number, required: true }
+});
+var SessionModel = mongoose2.models.Session || mongoose2.model("Session", SessionSchema);
+
+// backend/controllers/auth.controller.ts
+import crypto3 from "node:crypto";
+async function createUserRecord(name, email, role, grade = "Class 8", rollNo, avatar, streak = 7, xp = 450) {
+  const normalizedEmail = email.toLowerCase().trim();
+  const id = `usr_${crypto3.randomUUID().slice(0, 8)}`;
+  const user = new UserModel({
+    id,
     name,
-    email: email.toLowerCase().trim(),
-    passwordHash,
-    salt,
+    email: normalizedEmail,
     role,
     grade,
     rollNo,
@@ -66,88 +180,64 @@ function createUserRecord(name, email, pass, role, grade = "Class 8", rollNo, av
     avatarUrl: avatar || "https://lh3.googleusercontent.com/aida-public/AB6AXuCK0-0JwP88HWKu6oQUjNCgb05unct8XMYddUw_uJdbLA0udACQT_FFuVSr1d5XjNIOslLrb6GEB48SK31UfdAcXtHCCJs_HYunCs3RvJhaIjgvn0JafTdn1Xb2gOzOhPMu-i423Gq716dY930KOuTNgm-J15PqGdJfd3NFMlTdAi0j_IKIOAfFxd77CAJUlH2GCMydp8pHzKBCW3tXWhy5Oj6nk8XJrIwC0E2V2FyRGY0uulK_ckKD",
     language: "EN",
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  usersDb.set(user.email, user);
-  return user;
+  });
+  await user.save();
+  return user.toObject();
 }
-function initializeSeedUsers() {
-  if (usersDb.size > 0) return;
-  createUserRecord(
-    "Pranav Sharma",
-    "pranav@shikshamitra.edu",
-    "password123",
-    "student",
-    "Class 8",
-    "Roll No. 07",
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCofhvp6W0pcY4JgW4XcGXjMh1X3s2zl2wQN0GBsPAM7-VrtJY97wm3Diz7KRv-OnKenEeh7iZAMXm2lTPNyXti5r-KZU7ASU45IDR4D6XLBMo7ZWaCujekzCSvgSAzIOJRpRHVTcu_FA8eTRem9lOf0ejN2NsVY16Kfzbkd0Dh0LqCVDTcvMfMl1DkKC8uI5n9tvSqPcq8LaqkGrX30-yLftlUlV0GEW4Is4AONzvxjQn3dAifdL0o",
-    12,
-    720
-  );
-  createUserRecord(
-    "Rahul Verma",
-    "rahul@shikshamitra.edu",
-    "password123",
-    "student",
-    "Class 8",
-    "Roll No. 12",
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCr2u_54g-QJqgG_5Lh99w0-g42n9-M99_1919k1817-j81728190-jklwndoiq0912j3012930-192-310-9123-1",
-    4,
-    380
-  );
-  createUserRecord(
-    "Anita Deshmukh",
-    "anita@shikshamitra.edu",
-    "password123",
-    "teacher",
-    "Middle School Lead",
-    void 0,
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuArQo7uLrplNf5RxigElyfquxORgDVwRiffuHJLlp8TO0VBqan1Pd2RJ0ZM5dhdFpN_me1a7GTtlyN_0jXgZ34yw8j8M30zHK1PlUlR2LgCG1AODsYRBaUp9E9n1aMGByMRuNPigKPjhw9T--SYAjFwKaPOkNzt6KlG7BipfkvCL4hFtcNQiIOFFOHq1frIxTXoHhyRnHxTzfnBxMBQeeT1qB-Gb9EoYA0u-301NUCrmI-bRFqS9erg",
-    30,
-    1850
-  );
-  createUserRecord(
-    "Sunita Sharma",
-    "sunita@shikshamitra.edu",
-    "password123",
-    "parent",
-    "Guardian of Pranav",
-    void 0,
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCK0-0JwP88HWKu6oQUjNCgb05unct8XMYddUw_uJdbLA0udACQT_FFuVSr1d5XjNIOslLrb6GEB48SK31UfdAcXtHCCJs_HYunCs3RvJhaIjgvn0JafTdn1Xb2gOzOhPMu-i423Gq716dY930KOuTNgm-J15PqGdJfd3NFMlTdAi0j_IKIOAfFxd77CAJUlH2GCMydp8pHzKBCW3tXWhy5Oj6nk8XJrIwC0E2V2FyRGY0uulK_ckKD",
-    7,
-    500
-  );
-}
-initializeSeedUsers();
-
-// backend/controllers/auth.controller.ts
-function getAuthenticatedUser(req) {
-  const token = req.cookies?.session_token || req.headers.authorization?.replace("Bearer ", "");
-  if (!token) return null;
-  const session = sessions.get(token);
-  if (!session || session.expiresAt < Date.now()) {
-    if (session) sessions.delete(token);
-    return null;
+async function getAuthenticatedUser(req) {
+  const token = req.cookies?.session_token;
+  if (token) {
+    const session = await SessionModel.findOne({ token });
+    if (session && session.expiresAt > Date.now()) {
+      const user = await UserModel.findOne({ id: session.userId }).lean();
+      if (user) return user;
+    }
   }
-  for (const user of usersDb.values()) {
-    if (user.id === session.userId) return user;
+  const authHeader = req.headers.authorization?.replace("Bearer ", "");
+  if (authHeader) {
+    try {
+      const attrs = await cognitoService.getUser(authHeader);
+      const email = attrs.email?.toLowerCase().trim();
+      if (!email) return null;
+      let user = await UserModel.findOne({ email }).lean();
+      if (!user) {
+        user = await createUserRecord(attrs.name || "User", email, attrs["custom:role"] || "student");
+      }
+      return user;
+    } catch (e) {
+      console.warn("JWT Auto-Restore failed:", e.message);
+    }
   }
   return null;
 }
 var authController = {
-  signup(req, res) {
+  async signup(req, res) {
     try {
       const { name, email, password, role = "student", grade = "Class 8" } = req.body;
       if (!name || !email || !password) {
         return res.status(400).json({ error: "Name, email, and password are required" });
       }
       const normalizedEmail = email.toLowerCase().trim();
-      if (usersDb.has(normalizedEmail)) {
+      const existingUser = await UserModel.findOne({ email: normalizedEmail });
+      if (existingUser) {
         return res.status(409).json({ error: "An account with this email already exists" });
       }
-      const newUser = createUserRecord(name, normalizedEmail, password, role, grade);
+      try {
+        await cognitoService.signUp(normalizedEmail, password, name, role);
+      } catch (cognitoErr) {
+        console.error("Cognito Signup Failed:", cognitoErr.message);
+        return res.status(400).json({ error: cognitoErr.message || "Failed to sign up with AWS" });
+      }
+      let cognitoAuth;
+      try {
+        cognitoAuth = await cognitoService.signIn(normalizedEmail, password);
+      } catch (loginErr) {
+        console.warn("Auto-login after signup failed:", loginErr.message);
+      }
+      const newUser = await createUserRecord(name, normalizedEmail, role, grade);
       const token = generateToken();
       const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1e3;
-      sessions.set(token, { userId: newUser.id, expiresAt });
+      await SessionModel.create({ token, userId: newUser.id, expiresAt });
       res.cookie("session_token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -157,31 +247,46 @@ var authController = {
       return res.status(201).json({
         message: "Signup successful",
         user: sanitizeUser(newUser),
-        token
+        token,
+        jwt: cognitoAuth
       });
     } catch (err) {
       console.error("Signup error:", err);
       return res.status(500).json({ error: "Internal server error during registration" });
     }
   },
-  login(req, res) {
+  async login(req, res) {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
         return res.status(400).json({ error: "Email and password are required" });
       }
       const normalizedEmail = email.toLowerCase().trim();
-      const user = usersDb.get(normalizedEmail);
-      if (!user) {
-        return res.status(401).json({ error: "Invalid email or password" });
+      let cognitoAuth;
+      try {
+        cognitoAuth = await cognitoService.signIn(normalizedEmail, password);
+      } catch (cognitoErr) {
+        console.error("Cognito Login Failed:", cognitoErr.message);
+        return res.status(401).json({ error: cognitoErr.message || "Invalid email or password" });
       }
-      const testHash = hashPassword(password, user.salt);
-      if (testHash !== user.passwordHash) {
-        return res.status(401).json({ error: "Invalid email or password" });
+      let user = await UserModel.findOne({ email: normalizedEmail }).lean();
+      if (!user) {
+        let realName = "User";
+        let realRole = "student";
+        if (cognitoAuth?.AccessToken) {
+          try {
+            const attrs = await cognitoService.getUser(cognitoAuth.AccessToken);
+            if (attrs.name) realName = attrs.name;
+            if (attrs["custom:role"]) realRole = attrs["custom:role"];
+          } catch (e) {
+            console.warn("Failed to fetch user attributes from Cognito", e);
+          }
+        }
+        user = await createUserRecord(realName, normalizedEmail, realRole);
       }
       const token = generateToken();
       const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1e3;
-      sessions.set(token, { userId: user.id, expiresAt });
+      await SessionModel.create({ token, userId: user.id, expiresAt });
       res.cookie("session_token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -191,43 +296,71 @@ var authController = {
       return res.json({
         message: "Login successful",
         user: sanitizeUser(user),
-        token
+        token,
+        jwt: cognitoAuth
       });
     } catch (err) {
       console.error("Login error:", err);
       return res.status(500).json({ error: "Internal server error during login" });
     }
   },
-  logout(req, res) {
+  async logout(req, res) {
     const token = req.cookies?.session_token || req.headers.authorization?.replace("Bearer ", "");
     if (token) {
-      sessions.delete(token);
+      await SessionModel.deleteOne({ token });
     }
     res.clearCookie("session_token");
     return res.json({ message: "Logged out successfully" });
   },
-  getMe(req, res) {
-    const user = getAuthenticatedUser(req);
+  async getMe(req, res) {
+    const user = await getAuthenticatedUser(req);
     if (!user) {
       return res.status(401).json({ error: "Unauthenticated", isAuthenticated: false });
     }
     return res.json({ user: sanitizeUser(user), isAuthenticated: true });
   },
-  switchDemo(req, res) {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "Email required" });
-    const user = usersDb.get(email.toLowerCase().trim());
-    if (!user) return res.status(404).json({ error: "User demo not found" });
-    const token = generateToken();
-    const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1e3;
-    sessions.set(token, { userId: user.id, expiresAt });
-    res.cookie("session_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1e3
-    });
-    return res.json({ user: sanitizeUser(user), token });
+  async getStudents(req, res) {
+    const user = await getAuthenticatedUser(req);
+    if (!user) return res.status(401).json({ error: "Unauthenticated" });
+    if (user.role === "teacher") {
+      const students = await UserModel.find({ role: "student" }).lean();
+      return res.json({ students: students.map(sanitizeUser) });
+    }
+    if (user.role === "parent") {
+      if (!user.studentIds || user.studentIds.length === 0) {
+        return res.json({ students: [] });
+      }
+      const students = await UserModel.find({ id: { $in: user.studentIds } }).lean();
+      return res.json({ students: students.map(sanitizeUser) });
+    }
+    return res.status(403).json({ error: "Unauthorized role" });
+  },
+  async linkStudent(req, res) {
+    const user = await getAuthenticatedUser(req);
+    if (!user || user.role !== "parent") {
+      return res.status(403).json({ error: "Only parents can link students" });
+    }
+    const { studentEmail } = req.body;
+    if (!studentEmail) return res.status(400).json({ error: "Student email required" });
+    const student = await UserModel.findOne({ email: studentEmail.toLowerCase().trim() });
+    if (!student || student.role !== "student") {
+      return res.status(404).json({ error: "Student not found" });
+    }
+    if (!user.studentIds) user.studentIds = [];
+    if (!user.studentIds.includes(student.id)) {
+      await UserModel.updateOne({ id: user.id }, { $push: { studentIds: student.id } });
+    }
+    if (!student.parentIds) student.parentIds = [];
+    if (!student.parentIds.includes(user.id)) {
+      await UserModel.updateOne({ id: student.id }, { $push: { parentIds: user.id } });
+    }
+    try {
+      await cognitoService.linkParentToStudent(user.email, student.email);
+    } catch (e) {
+      console.warn("Cognito link failed:", e.message);
+    }
+    const updatedStudent = await UserModel.findOne({ id: student.id }).lean();
+    return res.json({ message: "Student linked successfully", student: sanitizeUser(updatedStudent) });
   }
 };
 
@@ -237,7 +370,8 @@ router.post("/signup", authController.signup);
 router.post("/login", authController.login);
 router.post("/logout", authController.logout);
 router.get("/me", authController.getMe);
-router.post("/switch-demo", authController.switchDemo);
+router.get("/students", authController.getStudents);
+router.post("/link-student", authController.linkStudent);
 var auth_routes_default = router;
 
 // backend/routes/ai.routes.ts
@@ -245,6 +379,8 @@ import { Router as Router2 } from "express";
 
 // backend/services/gemini.service.ts
 import { GoogleGenAI } from "@google/genai";
+import dotenv2 from "dotenv";
+dotenv2.config();
 var ai = config.geminiApiKey ? new GoogleGenAI({
   apiKey: config.geminiApiKey,
   httpOptions: {
@@ -253,10 +389,11 @@ var ai = config.geminiApiKey ? new GoogleGenAI({
     }
   }
 }) : null;
+console.log("AI is", ai, "apikey ", config.geminiApiKey);
 var FALLBACK_MODELS = [
-  "gemini-2.5-flash-lite",
-  "gemini-2.5-flash",
-  "gemini-3.8-flash"
+  "gemini-3.8-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite"
 ];
 async function generateGeminiWithFallback(params) {
   if (!ai) return null;
@@ -279,7 +416,7 @@ async function generateGeminiWithFallback(params) {
 function getHeuristicTeacherReply(message) {
   const lower = message.toLowerCase();
   if (lower.includes("quadratic") || lower.includes("2x^2") || lower.includes("equation")) {
-    return `Namaste beta! Let's look at quadratic equations like 2x\xB2 + 5x = 0 with ease!
+    return `Let's look at quadratic equations like 2x\xB2 + 5x = 0 with ease!
 
 \u{1F4A1} **Key Concept**: Factoring out common terms.
 - Look at both terms: **2x\xB2** and **5x**.
@@ -290,7 +427,7 @@ Now apply the zero-product rule: either **x = 0** or **2x + 5 = 0** (which means
 See how simple it becomes once we factor? How does that feel to you?`;
   }
   if (lower.includes("zinc") || lower.includes("acid") || lower.includes("gas") || lower.includes("chemistry")) {
-    return `Namaste! Great observation from our science lab experiment!
+    return `Great observation from our science lab experiment!
 
 \u{1F52C} When solid **Zinc granules (Zn)** are dropped into dilute **Hydrochloric Acid (HCl)**:
 - Chemical Reaction: **Zn + 2HCl \u2192 ZnCl\u2082 + H\u2082\u2191**
@@ -301,7 +438,7 @@ See how simple it becomes once we factor? How does that feel to you?`;
 Isn't that exciting? Would you like to know how we test for other gases like Oxygen or Carbon Dioxide too?`;
   }
   if (lower.includes("pythagoras") || lower.includes("triangle") || lower.includes("hypotenuse")) {
-    return `Namaste! The Pythagorean theorem (a\xB2 + b\xB2 = c\xB2) is one of my favorite geometry discoveries!
+    return `The Pythagorean theorem (a\xB2 + b\xB2 = c\xB2) is one of my favorite geometry discoveries!
 
 \u{1F4D0} Think of a right-angled triangle like a ladder leaning against a wall:
 - Ground distance is **a**
@@ -313,7 +450,7 @@ For instance, if a = 3 and b = 4, then:
 3\xB2 + 4\xB2 = 9 + 16 = 25, and \u221A25 = **5**!`;
   }
   if (lower.includes("division") || lower.includes("456")) {
-    return `Namaste! Dividing 456 by 12 is like distributing 456 mangoes into boxes of 12!
+    return `Dividing 456 by 12 is like distributing 456 mangoes into boxes of 12!
 
 Let's do it in 2 simple steps:
 1. Look at the first two digits **45**:
@@ -325,7 +462,7 @@ Let's do it in 2 simple steps:
 
 So 456 \xF7 12 = **38** with zero remainder! Did that step make sense?`;
   }
-  return `Namaste beta! I am Anita Ma'am, your learning mentor. That is a wonderful question! Let's break it down:
+  return `I am Anita Ma'am, your learning mentor. That is a wonderful question! Let's break it down:
 
 1. First, identify what values are given and what the problem is asking you to solve.
 2. Remember that science and math are all about patterns\u2014like balancing ingredients in a recipe.
@@ -336,40 +473,125 @@ What is the very first step you feel confident trying here?`;
 
 // backend/controllers/ai.controller.ts
 var aiController = {
-  async teacherChat(req, res) {
+  async generateFlashcardExplanation(req, res) {
+    const { formula, title, def } = req.body;
+    if (ai) {
+      try {
+        const prompt = `You are an AI teacher. A student is reviewing a flashcard about "${title}" (Formula: ${formula}). The formal definition is: "${def}".
+Please provide a highly intuitive, real-world everyday analogy (like the farm example for the Pythagorean theorem) to make this concept crystal clear. Keep it to 3-4 sentences. Use markdown for readability.`;
+        const explanation = await generateGeminiWithFallback({ contents: prompt });
+        if (explanation) {
+          return res.json({ explanation });
+        }
+      } catch (e) {
+        console.warn("Failed to generate explanation", e.message);
+      }
+    }
+    return res.json({ explanation: `Imagine applying ${title} in your daily life! It's like balancing a seesaw or walking across a field. (Fallback explanation)` });
+  },
+  async generateTargetedFlashcards(req, res) {
+    const { topic } = req.body;
+    if (ai) {
+      try {
+        const prompt = `Generate 2 educational flashcards for a Class 8 student struggling with ${topic}.
+Return ONLY a valid JSON array with objects containing: 'formula' (or key concept), 'title', 'def' (definition). No markdown wrapping, just JSON.`;
+        const responseText = await generateGeminiWithFallback({ contents: prompt });
+        if (responseText) {
+          const cleanJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+          const cards = JSON.parse(cleanJson);
+          return res.json({ cards });
+        }
+      } catch (e) {
+        console.warn("Failed to generate targeted flashcards", e.message);
+      }
+    }
+    return res.json({ cards: [{ formula: "Targeted Review", title: topic, def: `Review the basics of ${topic}.` }] });
+  },
+  async ttsProxy(req, res) {
+    const text = req.query.text;
+    const tl = req.query.tl || "en-IN";
+    if (!text) {
+      return res.status(400).json({ error: "text is required" });
+    }
+    try {
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${encodeURIComponent(text)}`;
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+          "Referer": "https://translate.google.com/"
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Google TTS returned ${response.status}`);
+      }
+      const contentType = response.headers.get("content-type");
+      if (contentType) res.setHeader("Content-Type", contentType);
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      res.send(buffer);
+    } catch (error) {
+      console.error("TTS Proxy Error:", error.message);
+      res.status(500).json({ error: "Failed to fetch TTS" });
+    }
+  },
+  async teacherChatStream(req, res) {
+    console.log("AI request");
     const { message, history = [], subject = "Science & Math", language = "English" } = req.body;
     if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "Message text is required" });
     }
-    if (ai) {
-      try {
-        const systemPrompt = `You are Anita Ma'am, a compassionate, patient Indian Middle School Teacher (Class 8) and Socratic Mentor for the Shiksha Mitra learning platform.
+    const systemPrompt = `You are Anita Ma'am, a compassionate, patient Indian Middle School Teacher (Class 8) and Socratic Mentor for the Shiksha Mitra learning platform.
 Role guidelines:
-1. Warm, encouraging Indian teacher persona ("Namaste beta!", "Wonderful attempt!", "Let us break it down step-by-step").
+1. Warm, encouraging Indian teacher persona ("Wonderful attempt!", "Let us break it down step-by-step"). Do NOT start your responses with greetings like "Namaste beta!".
 2. Teach using the Socratic Method: don't just dump final answers; guide students through step-by-step thinking.
 3. Current subject focus: ${subject}. Preferred language: ${language}.
 4. Provide structured, visually clean responses: bold key terms, use clear numbered steps, format math cleanly (e.g. 2x\xB2 + 5x = 0, x(2x + 5) = 0).
 5. Always end with an encouraging question or next tiny step for the student to try.`;
-        const conversationContext = history.slice(-6).map((m) => `${m.sender === "user" ? "Student" : "Anita Ma'am"}: ${m.text}`).join("\n\n");
-        const prompt = `${conversationContext ? `Recent conversation context:
+    const conversationContext = history.slice(-6).map((m) => `${m.sender === "user" ? "Student" : "Anita Ma'am"}: ${m.text}`).join("\n\n");
+    const prompt = `${conversationContext ? `Recent conversation context:
 ${conversationContext}
 
 ` : ""}Student's current question: "${message}"
 
 Anita Ma'am, please guide the student:`;
-        const reply = await generateGeminiWithFallback({
-          contents: prompt,
-          systemInstruction: systemPrompt
-        });
-        if (reply) {
-          return res.json({ reply });
+    if (ai) {
+      const MODELS = [
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-3.8-flash"
+      ];
+      for (const model of MODELS) {
+        try {
+          console.log("Using model", model);
+          const streamResult = await ai.models.generateContentStream({
+            model,
+            contents: prompt,
+            config: { systemInstruction: systemPrompt }
+          });
+          res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          res.setHeader("Transfer-Encoding", "chunked");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("X-Accel-Buffering", "no");
+          for await (const chunk of streamResult) {
+            const text = chunk.text;
+            if (text) res.write(text);
+          }
+          res.end();
+          return;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[AI Controller] Stream model ${model} failed:`, msg);
+          if (res.headersSent) {
+            res.end();
+            return;
+          }
         }
-      } catch (error) {
-        console.warn("[AI Controller] Teacher Chat error, using heuristic fallback:", error?.message);
       }
     }
-    const fallbackReply = getHeuristicTeacherReply(message);
-    return res.json({ reply: fallbackReply });
+    const fallback = getHeuristicTeacherReply(message);
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.write(fallback);
+    res.end();
   },
   async socraticHint(req, res) {
     const { question, currentInput, context, language = "English" } = req.body;
@@ -427,21 +649,15 @@ Output a concise 2-sentence diagnostic identifying:
     });
   },
   evaluateBatch(req, res) {
-    const { batchId = "batch_term1_math", totalPapers = 14 } = req.body;
-    const results = [
-      { studentName: "Rahul Verma", rollNo: "12", score: 68, status: "Needs Review", loophole: "Variable Isolation" },
-      { studentName: "Pranav Sharma", rollNo: "07", score: 82, status: "Good Progress", loophole: "Minor Step Check" },
-      { studentName: "Aarav Patel", rollNo: "02", score: 94, status: "Mastered", loophole: "None" },
-      { studentName: "Diya Kulkarni", rollNo: "19", score: 74, status: "Steady", loophole: "Exponent Rules" },
-      { studentName: "Sneha Jadhav", rollNo: "24", score: 58, status: "Needs Support", loophole: "Fraction Operations" }
-    ];
+    const { batchId = req.body.batchId || "batch_term1_math", totalPapers = req.body.totalPapers || 0 } = req.body;
+    const results = [];
     return res.json({
       batchId,
       totalPapers,
-      evaluatedCount: 14,
-      classAverage: 75.2,
-      loopholesIdentified: 3,
-      topGap: "Fraction Operations (60% of class)",
+      evaluatedCount: 0,
+      classAverage: 0,
+      loopholesIdentified: 0,
+      topGap: "None",
       students: results,
       completedAt: (/* @__PURE__ */ new Date()).toISOString()
     });
@@ -450,10 +666,13 @@ Output a concise 2-sentence diagnostic identifying:
 
 // backend/routes/ai.routes.ts
 var router2 = Router2();
-router2.post("/teacher-chat", aiController.teacherChat);
+router2.post("/teacher-chat", aiController.teacherChatStream);
 router2.post("/socratic-hint", aiController.socraticHint);
 router2.post("/diagnose-loophole", aiController.diagnoseLoophole);
 router2.post("/evaluate-batch", aiController.evaluateBatch);
+router2.get("/tts", aiController.ttsProxy);
+router2.post("/flashcard-explanation", aiController.generateFlashcardExplanation);
+router2.post("/generate-targeted-flashcards", aiController.generateTargetedFlashcards);
 var ai_routes_default = router2;
 
 // backend/routes/aws.routes.ts
@@ -707,7 +926,8 @@ var awsController = {
   async syncData(_req, res) {
     try {
       let syncedCount = 0;
-      for (const [, user] of usersDb.entries()) {
+      const users = await UserModel.find().lean();
+      for (const user of users) {
         await dynamoService.putRecord({
           PK: `USER#${user.id}`,
           SK: "PROFILE",
@@ -746,13 +966,13 @@ router4.use("/aws", aws_routes_default);
 var routes_default = router4;
 
 // backend/server.ts
-var __filename = fileURLToPath(import.meta.url);
-var __dirname = path.dirname(__filename);
-var rootDir = path.resolve(__dirname, "..");
+var __filename2 = fileURLToPath2(import.meta.url);
+var __dirname2 = path2.dirname(__filename2);
 var app = express();
 var httpServer = http.createServer(app);
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
+app.use(cors({ origin: true, credentials: true }));
 app.use("/api", routes_default);
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -764,50 +984,24 @@ app.get("/api/health", (_req, res) => {
   });
 });
 async function startServer() {
-  const isProduction = config.nodeEnv === "production" || process.env.NODE_ENV === "production" || !process.env.NODE_ENV && fs.existsSync(path.join(rootDir, "dist", "index.html"));
+  const isProduction = config.nodeEnv === "production" || process.env.NODE_ENV === "production";
   if (!isProduction) {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: {
-        middlewareMode: true
-      },
-      appType: "spa",
-      configFile: path.join(rootDir, "vite.config.ts"),
-      root: path.join(rootDir, "frontend")
-    });
-    app.use(vite.middlewares);
     app.use("*", async (req, res, next) => {
       const url = req.originalUrl;
       if (url.startsWith("/api")) {
         return next();
       }
-      try {
-        const indexPath = path.join(rootDir, "frontend", "index.html");
-        if (fs.existsSync(indexPath)) {
-          let template = fs.readFileSync(indexPath, "utf-8");
-          template = await vite.transformIndexHtml(url, template);
-          res.status(200).set({ "Content-Type": "text/html" }).end(template);
-        } else {
-          next();
-        }
-      } catch (e) {
-        vite.ssrFixStacktrace(e);
-        next(e);
-      }
     });
-  } else {
-    const distPath = path.join(rootDir, "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res, next) => {
-      if (req.originalUrl.startsWith("/api")) {
-        return next();
-      }
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+  }
+  try {
+    await mongoose3.connect(config.mongoUri);
+    console.log("[Shiksha Mitra AI] Connected to MongoDB");
+  } catch (error) {
+    console.error("[Shiksha Mitra AI] MongoDB connection error:", error);
   }
   return httpServer.listen(config.port, "0.0.0.0", () => {
     console.log(
-      `[Shiksha Mitra AI] Modular full-stack backend running on http://localhost:${config.port} (${isProduction ? "production" : "development"})`
+      `[Shiksha Mitra AI] backend running on http://localhost:${config.port} (${isProduction ? "production" : "development"})`
     );
   });
 }

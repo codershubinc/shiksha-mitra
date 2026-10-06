@@ -7,6 +7,7 @@ router.post('/signup', authController.signup);
 router.post('/login', authController.login);
 router.post('/logout', authController.logout);
 router.get('/me', authController.getMe);
-router.post('/switch-demo', authController.switchDemo);
+router.get('/students', authController.getStudents);
+router.post('/link-student', authController.linkStudent);
 
 export default router;

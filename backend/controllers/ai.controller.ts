@@ -6,46 +6,159 @@ import {
 } from '../services/gemini.service.js';
 
 export const aiController = {
-  async teacherChat(req: Request, res: Response) {
+
+  async generateFlashcardExplanation(req: Request, res: Response) {
+    const { formula, title, def } = req.body;
+    if (ai) {
+      try {
+        const prompt = `You are an AI teacher. A student is reviewing a flashcard about "${title}" (Formula: ${formula}). The formal definition is: "${def}".
+Please provide a highly intuitive, real-world everyday analogy (like the farm example for the Pythagorean theorem) to make this concept crystal clear. Keep it to 3-4 sentences. Use markdown for readability.`;
+
+        const explanation = await generateGeminiWithFallback({ contents: prompt });
+        if (explanation) {
+          return res.json({ explanation });
+        }
+      } catch (e: any) {
+        console.warn('Failed to generate explanation', e.message);
+      }
+    }
+    return res.json({ explanation: `Imagine applying ${title} in your daily life! It's like balancing a seesaw or walking across a field. (Fallback explanation)` });
+  },
+
+  async generateTargetedFlashcards(req: Request, res: Response) {
+    const { topic } = req.body;
+    if (ai) {
+      try {
+        const prompt = `Generate 2 educational flashcards for a Class 8 student struggling with ${topic}.
+Return ONLY a valid JSON array with objects containing: 'formula' (or key concept), 'title', 'def' (definition). No markdown wrapping, just JSON.`;
+        const responseText = await generateGeminiWithFallback({ contents: prompt });
+        if (responseText) {
+          // Clean markdown formatting if present
+          const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+          const cards = JSON.parse(cleanJson);
+          return res.json({ cards });
+        }
+      } catch (e: any) {
+        console.warn('Failed to generate targeted flashcards', e.message);
+      }
+    }
+    return res.json({ cards: [{ formula: 'Targeted Review', title: topic, def: `Review the basics of ${topic}.` }] });
+  },
+
+
+  async ttsProxy(req: Request, res: Response) {
+    const text = req.query.text as string;
+    const tl = (req.query.tl as string) || 'en-IN';
+
+    if (!text) {
+      return res.status(400).json({ error: 'text is required' });
+    }
+
+    try {
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${encodeURIComponent(text)}`;
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Referer': 'https://translate.google.com/'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Google TTS returned ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+
+      // Node.js stream pipeline workaround using ArrayBuffer
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error('TTS Proxy Error:', error.message);
+      res.status(500).json({ error: 'Failed to fetch TTS' });
+    }
+  },
+
+  async teacherChatStream(req: Request, res: Response) {
+    console.log("AI request");
+
     const { message, history = [], subject = 'Science & Math', language = 'English' } = req.body;
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message text is required' });
     }
 
-    if (ai) {
-      try {
-        const systemPrompt = `You are Anita Ma'am, a compassionate, patient Indian Middle School Teacher (Class 8) and Socratic Mentor for the Shiksha Mitra learning platform.
+    const systemPrompt = `You are Anita Ma'am, a compassionate, patient Indian Middle School Teacher (Class 8) and Socratic Mentor for the Shiksha Mitra learning platform.
 Role guidelines:
-1. Warm, encouraging Indian teacher persona ("Namaste beta!", "Wonderful attempt!", "Let us break it down step-by-step").
+1. Warm, encouraging Indian teacher persona ("Wonderful attempt!", "Let us break it down step-by-step"). Do NOT start your responses with greetings like "Namaste beta!".
 2. Teach using the Socratic Method: don't just dump final answers; guide students through step-by-step thinking.
 3. Current subject focus: ${subject}. Preferred language: ${language}.
 4. Provide structured, visually clean responses: bold key terms, use clear numbered steps, format math cleanly (e.g. 2x² + 5x = 0, x(2x + 5) = 0).
 5. Always end with an encouraging question or next tiny step for the student to try.`;
 
-        const conversationContext = history
-          .slice(-6)
-          .map((m: any) => `${m.sender === 'user' ? 'Student' : 'Anita Ma\'am'}: ${m.text}`)
-          .join('\n\n');
+    const conversationContext = history
+      .slice(-6)
+      .map((m: { sender: string; text: string }) => `${m.sender === 'user' ? 'Student' : "Anita Ma'am"}: ${m.text}`)
+      .join('\n\n');
 
-        const prompt = `${conversationContext ? `Recent conversation context:\n${conversationContext}\n\n` : ''}Student's current question: "${message}"\n\nAnita Ma'am, please guide the student:`;
+    const prompt = `${conversationContext ? `Recent conversation context:\n${conversationContext}\n\n` : ''}Student's current question: "${message}"\n\nAnita Ma'am, please guide the student:`;
 
-        const reply = await generateGeminiWithFallback({
-          contents: prompt,
-          systemInstruction: systemPrompt,
-        });
+    if (ai) {
+      const MODELS = [
+        'gemini-3.5-flash-lite',
+        'gemini-3.5-flash',
+        'gemini-3.8-flash',
+      ];
 
-        if (reply) {
-          return res.json({ reply });
+      for (const model of MODELS) {
+        try {
+          console.log("Using model", model);
+
+          const streamResult = await ai.models.generateContentStream({
+            model,
+            contents: prompt,
+            config: { systemInstruction: systemPrompt },
+          });
+
+          // Only write headers once we have a working stream
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.setHeader('Transfer-Encoding', 'chunked');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('X-Accel-Buffering', 'no');
+
+          for await (const chunk of streamResult) {
+            const text = chunk.text;
+            if (text) res.write(text);
+          }
+          res.end();
+          return;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[AI Controller] Stream model ${model} failed:`, msg);
+          if (res.headersSent) {
+            res.end();
+            return;
+          }
         }
-      } catch (error: any) {
-        console.warn('[AI Controller] Teacher Chat error, using heuristic fallback:', error?.message);
       }
     }
 
-    const fallbackReply = getHeuristicTeacherReply(message);
-    return res.json({ reply: fallbackReply });
+    // All models failed → heuristic plain-text fallback
+    const fallback = getHeuristicTeacherReply(message);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.write(fallback);
+    res.end();
   },
+
+
+
+
+
+
+
+
 
   async socraticHint(req: Request, res: Response) {
     const { question, currentInput, context, language = 'English' } = req.body;
@@ -115,23 +228,17 @@ Output a concise 2-sentence diagnostic identifying:
   },
 
   evaluateBatch(req: Request, res: Response) {
-    const { batchId = 'batch_term1_math', totalPapers = 14 } = req.body;
+    const { batchId = req.body.batchId || 'batch_term1_math', totalPapers = req.body.totalPapers || 0 } = req.body;
 
-    const results = [
-      { studentName: 'Rahul Verma', rollNo: '12', score: 68, status: 'Needs Review', loophole: 'Variable Isolation' },
-      { studentName: 'Pranav Sharma', rollNo: '07', score: 82, status: 'Good Progress', loophole: 'Minor Step Check' },
-      { studentName: 'Aarav Patel', rollNo: '02', score: 94, status: 'Mastered', loophole: 'None' },
-      { studentName: 'Diya Kulkarni', rollNo: '19', score: 74, status: 'Steady', loophole: 'Exponent Rules' },
-      { studentName: 'Sneha Jadhav', rollNo: '24', score: 58, status: 'Needs Support', loophole: 'Fraction Operations' },
-    ];
+    const results: any[] = [];
 
     return res.json({
       batchId,
       totalPapers,
-      evaluatedCount: 14,
-      classAverage: 75.2,
-      loopholesIdentified: 3,
-      topGap: 'Fraction Operations (60% of class)',
+      evaluatedCount: 0,
+      classAverage: 0,
+      loopholesIdentified: 0,
+      topGap: 'None',
       students: results,
       completedAt: new Date().toISOString(),
     });

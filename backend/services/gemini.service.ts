@@ -1,21 +1,25 @@
 import { GoogleGenAI } from '@google/genai';
 import { config } from '../config/env.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 export const ai = config.geminiApiKey
   ? new GoogleGenAI({
-      apiKey: config.geminiApiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
+    apiKey: config.geminiApiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
       },
-    })
+    },
+  })
   : null;
+console.log("AI is", ai, "apikey ", config.geminiApiKey);
+
 
 export const FALLBACK_MODELS = [
-  'gemini-2.5-flash-lite',
-  'gemini-2.5-flash',
   'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
 ];
 
 export async function generateGeminiWithFallback(params: {
@@ -49,7 +53,7 @@ export function getHeuristicTeacherReply(message: string): string {
   const lower = message.toLowerCase();
 
   if (lower.includes('quadratic') || lower.includes('2x^2') || lower.includes('equation')) {
-    return `Namaste beta! Let's look at quadratic equations like 2x² + 5x = 0 with ease!
+    return `Let's look at quadratic equations like 2x² + 5x = 0 with ease!
 
 💡 **Key Concept**: Factoring out common terms.
 - Look at both terms: **2x²** and **5x**.
@@ -61,7 +65,7 @@ See how simple it becomes once we factor? How does that feel to you?`;
   }
 
   if (lower.includes('zinc') || lower.includes('acid') || lower.includes('gas') || lower.includes('chemistry')) {
-    return `Namaste! Great observation from our science lab experiment!
+    return `Great observation from our science lab experiment!
 
 🔬 When solid **Zinc granules (Zn)** are dropped into dilute **Hydrochloric Acid (HCl)**:
 - Chemical Reaction: **Zn + 2HCl → ZnCl₂ + H₂↑**
@@ -73,7 +77,7 @@ Isn't that exciting? Would you like to know how we test for other gases like Oxy
   }
 
   if (lower.includes('pythagoras') || lower.includes('triangle') || lower.includes('hypotenuse')) {
-    return `Namaste! The Pythagorean theorem (a² + b² = c²) is one of my favorite geometry discoveries!
+    return `The Pythagorean theorem (a² + b² = c²) is one of my favorite geometry discoveries!
 
 📐 Think of a right-angled triangle like a ladder leaning against a wall:
 - Ground distance is **a**
@@ -86,7 +90,7 @@ For instance, if a = 3 and b = 4, then:
   }
 
   if (lower.includes('division') || lower.includes('456')) {
-    return `Namaste! Dividing 456 by 12 is like distributing 456 mangoes into boxes of 12!
+    return `Dividing 456 by 12 is like distributing 456 mangoes into boxes of 12!
 
 Let's do it in 2 simple steps:
 1. Look at the first two digits **45**:
@@ -99,7 +103,7 @@ Let's do it in 2 simple steps:
 So 456 ÷ 12 = **38** with zero remainder! Did that step make sense?`;
   }
 
-  return `Namaste beta! I am Anita Ma'am, your learning mentor. That is a wonderful question! Let's break it down:
+  return `I am Anita Ma'am, your learning mentor. That is a wonderful question! Let's break it down:
 
 1. First, identify what values are given and what the problem is asking you to solve.
 2. Remember that science and math are all about patterns—like balancing ingredients in a recipe.

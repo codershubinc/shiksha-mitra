@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { dynamoService } from '../services/dynamodb.service.js';
-import { usersDb } from '../models/user.model.js';
+import { UserModel } from '../models/user.model.js';
 import { sanitizeUser } from '../utils/crypto.utils.js';
 
 export const awsController = {
@@ -58,7 +58,8 @@ export const awsController = {
   async syncData(_req: Request, res: Response) {
     try {
       let syncedCount = 0;
-      for (const [, user] of usersDb.entries()) {
+      const users = await UserModel.find().lean();
+      for (const user of users) {
         await dynamoService.putRecord({
           PK: `USER#${user.id}`,
           SK: 'PROFILE',
