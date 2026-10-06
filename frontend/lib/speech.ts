@@ -3,6 +3,8 @@
  * Specially engineered for browser iframes, mobile web, and Chrome/Safari audio contexts
  */
 
+import { BACKEND_URL } from './api';
+
 let speechVoices: SpeechSynthesisVoice[] = [];
 let voicesLoaded = false;
 
@@ -405,8 +407,7 @@ class SpeechPlaybackController {
     // Google Translate TTS
     try {
       const tl = this.options.language === 'Hindi' ? 'hi' : 'en-IN';
-      const backendUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3000` : 'http://localhost:3000';
-      const url = `${backendUrl}/api/ai/tts?tl=${tl}&text=${encodeURIComponent(sentence)}`;
+      const url = `${BACKEND_URL}/api/ai/tts?tl=${tl}&text=${encodeURIComponent(sentence)}`;
       const audio = new Audio(url);
       activeGoogleAudio = audio;
 
