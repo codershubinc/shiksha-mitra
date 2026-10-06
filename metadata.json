@@ -1,0 +1,6 @@
+{
+  "name": "Shiksha Mitra AI",
+  "description": "Empathetic Socratic learning platform with AI loophole diagnostics, interactive mock exams, flashcard spaced repetition, bulk evaluation, and career pathways in modern dark glassmorphism.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
