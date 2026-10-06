@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
+import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -9,23 +9,22 @@ import {
   Send,
   Volume2,
   VolumeX,
-  Volume1,
   Sparkles,
   ArrowLeft,
   RotateCcw,
   BookOpen,
-  GraduationCap,
-  MessageCircle,
   CheckCircle2,
-  Languages,
-  Save,
-  Trash2,
-  Settings2,
+  Copy,
+  Check,
+  Radio,
+  Sliders,
   Square,
   Play,
   Flame,
-  Radio,
-  Sliders,
+  HelpCircle,
+  Calculator,
+  FlaskConical,
+  Atom,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -33,7 +32,6 @@ import {
   playTeacherSpeech,
   stopTeacherSpeech,
   testTeacherVoice,
-  getAllVoices,
   loadVoices,
   playAudibleChime,
 } from '../../lib/speech';
@@ -54,18 +52,25 @@ const STORAGE_KEY = 'shiksha_mitra_teacher_chat_history_v1';
 const defaultWelcomeMessage: Message = {
   id: 'msg-default-1',
   sender: 'teacher',
-  text: `Namaste beta! I am Anita Ma'am, your AI Teacher and Socratic Mentor. 
+  text: `Namaste beta! I am Anita Ma'am, your personal AI Teacher and mentor.
 
-Whether you're stuck on a math equation like **$2x^2 + 5x = 0$**, curious about a science lab experiment, or reviewing exam doubts, I am here to guide you step-by-step. 
+Whether you're stuck on an algebra equation like **$2x^2 + 5x = 0$**, curious about a science lab experiment, or reviewing your exam doubts, I will guide you step-by-step to find the answer.
 
-What would you like to explore together today? Click the **Listen to Ma'am** button anytime to hear me explain aloud!`,
+What concept or problem would you like to explore together right now? Click **Listen to Ma'am** anytime to hear me explain aloud!`,
   timestamp: 'Just now',
 };
+
+const subjects = [
+  { id: 'Mathematics', label: 'Mathematics', icon: Calculator },
+  { id: 'Science & Chemistry', label: 'Science & Chemistry', icon: FlaskConical },
+  { id: 'Physics & Motion', label: 'Physics', icon: Atom },
+  { id: 'General Doubts', label: 'General Doubts', icon: HelpCircle },
+];
 
 export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenProps) {
   const { user, updateUserXp } = useAuth();
 
-  // Load initial messages from localStorage
+  // Load chat history
   const [messages, setMessages] = useState<Message[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -76,17 +81,18 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
         }
       }
     } catch (e) {
-      console.warn('Could not retrieve chat from local storage:', e);
+      // Fallback
     }
     return [defaultWelcomeMessage];
   });
 
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedSubject, setSelectedSubject] = useState('Science & Math');
+  const [selectedSubject, setSelectedSubject] = useState('Mathematics');
   const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Hindi' | 'Hinglish'>('English');
+  const [autoSpeak, setAutoSpeak] = useState(true);
 
-  // Speech & Audio state
+  // Audio / Speech state
   const [isSpeakingId, setIsSpeakingId] = useState<string | null>(null);
   const [currentSpokenSentence, setCurrentSpokenSentence] = useState<string>('');
   const [sentenceProgress, setSentenceProgress] = useState<{ index: number; total: number }>({
@@ -97,31 +103,26 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
   const [speechVolume, setSpeechVolume] = useState<number>(1.0);
   const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
   const [isTestingVoice, setIsTestingVoice] = useState(false);
-  const [showSavedToast, setShowSavedToast] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Sync to localStorage
+  // Keep saved quietly without annoying alerts
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-      setShowSavedToast(true);
-      const timer = setTimeout(() => setShowSavedToast(false), 2000);
-      return () => clearTimeout(timer);
-    } catch (e) {
-      console.warn('Could not save chat to local storage:', e);
-    }
+    } catch (e) {}
   }, [messages]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
 
-  // Clean up speech when unmounting
   useEffect(() => {
     loadVoices();
     return () => {
@@ -129,18 +130,37 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
     };
   }, []);
 
-  const quickPrompts = [
-    'Why does Zinc react with dilute HCl to produce bubbles?',
-    'How do I solve 2x² + 5x = 0 step-by-step?',
-    'Explain the Pythagorean theorem with a real-life example',
-    'How do I divide 456 by 12 without getting confused?',
-  ];
+  const quickPromptsBySubject: Record<string, string[]> = {
+    Mathematics: [
+      'How do I solve 2x² + 5x = 0 step-by-step?',
+      'Explain the Pythagorean theorem with a real-life triangle example',
+      'How do I divide 456 by 12 without getting confused?',
+      'What is the formula for the surface area of a cylinder?',
+    ],
+    'Science & Chemistry': [
+      'Why does Zinc react with dilute HCl to produce hydrogen gas bubbles?',
+      'What is the difference between physical and chemical changes?',
+      'Why does copper turn green when exposed to moist air?',
+      'How does litmus paper test acids versus bases?',
+    ],
+    'Physics & Motion': [
+      'What is the difference between speed and velocity?',
+      'Can you explain Newton’s 1st Law of Motion with an example?',
+      'Why does friction produce heat?',
+      'How does atmospheric pressure change at higher altitudes?',
+    ],
+    'General Doubts': [
+      'I have an exam tomorrow, how should I revise key formulas?',
+      'How do I overcome silly calculation mistakes in algebra?',
+      'Can you quiz me with 3 quick science questions?',
+      'Help me create a 30-minute daily study plan',
+    ],
+  };
 
   const handleSend = async (textToSend?: string) => {
     const text = textToSend || inputText.trim();
     if (!text || loading) return;
 
-    // Stop previous speech if any
     handleStopSpeech();
 
     const userMsg: Message = {
@@ -175,20 +195,23 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
       };
 
       setMessages((prev) => [...prev, teacherMsg]);
-      updateUserXp(5); // Reward 5 XP
+      updateUserXp(5);
 
-      // Auto-trigger audible speech for teacher reply
-      handleSpeakMessage(teacherMsg.text, teacherMsg.id);
+      if (autoSpeak) {
+        handleSpeakMessage(teacherMsg.text, teacherMsg.id);
+      }
     } catch (err: any) {
       const errorMsg: Message = {
         id: `err-${Date.now()}`,
         sender: 'teacher',
         text:
-          "Beta, I had a brief connection pause. But remember: in **$2x^2 + 5x = 0$**, both terms share '$x$', so we factor out $x$ to get **$x(2x + 5) = 0$**! What do you think $x$ equals next?",
+          "Beta, I had a brief network hesitation. But let's stay focused: in **$2x^2 + 5x = 0$**, both terms share '$x$', so we factor out $x$ to get **$x(2x + 5) = 0$**! What do you think $x$ equals next?",
         timestamp: 'Just now',
       };
       setMessages((prev) => [...prev, errorMsg]);
-      handleSpeakMessage(errorMsg.text, errorMsg.id);
+      if (autoSpeak) {
+        handleSpeakMessage(errorMsg.text, errorMsg.id);
+      }
     } finally {
       setLoading(false);
     }
@@ -203,7 +226,7 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
       {
         id: `msg-reset-${Date.now()}`,
         sender: 'teacher',
-        text: "New conversation started! Chat history has been reset. What topic or homework problem can I guide you on today, beta?",
+        text: "New study session started! What topic or homework problem can I guide you on today, beta?",
         timestamp: 'Just now',
       },
     ]);
@@ -233,8 +256,7 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
         setIsSpeakingId(null);
         setCurrentSpokenSentence('');
       },
-      onError: (err) => {
-        console.warn('Speech playback notification:', err);
+      onError: () => {
         setIsSpeakingId(null);
         setCurrentSpokenSentence('');
       },
@@ -256,60 +278,117 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
     });
   };
 
+  const handleCopy = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1800);
+  };
+
+  const activePrompts = quickPromptsBySubject[selectedSubject] || quickPromptsBySubject['Mathematics'];
+
   return (
-    <div className="flex flex-col h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-7.5rem)] max-w-4xl mx-auto w-full px-3 sm:px-4">
-      {/* Top Header Card */}
-      <header className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 mb-3 shadow-xl">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => onNavigate('dashboard')}
-            className="w-9 h-9 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
-            title="Back to Student Hub"
+    <div className="h-dvh w-full flex flex-col bg-[#070b14] overflow-hidden select-none">
+      {/* Full-Screen Sleek Top Header */}
+      <header className="shrink-0 h-16 border-b border-white/10 bg-slate-950/90 backdrop-blur-2xl px-3 sm:px-6 flex items-center justify-between z-30 shadow-lg">
+        {/* Left: Back & Teacher Profile */}
+        <div className="flex items-center gap-2.5 sm:gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              handleStopSpeech();
+              onNavigate('dashboard');
+            }}
+            className="text-slate-300 hover:text-white hover:bg-white/10 gap-1.5 px-2.5 h-9 rounded-xl cursor-pointer"
+            title="Return to Student Hub"
           >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
+            <ArrowLeft className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-semibold hidden md:inline">Dashboard</span>
+          </Button>
 
-          <div className="relative shrink-0">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuArQo7uLrplNf5RxigElyfquxORgDVwRiffuHJLlp8TO0VBqan1Pd2RJ0ZM5dhdFpN_me1a7GTtlyN_0jXgZ34yw8j8M30zHK1PlUlR2LgCG1AODsYRBaUp9E9n1aMGByMRuNPigKPjhw9T--SYAjFwKaPOkNzt6KlG7BipfkvCL4hFtcNQiIOFFOHq1frIxTXoHhyRnHxTzfnBxMBQeeT1qB-Gb9EoYA0u-301NUCrmI-bRFqS9erg"
-              alt="Anita Ma'am Teacher Agent"
-              className="w-11 h-11 rounded-2xl object-cover border-2 border-amber-500/60 shadow-md"
-            />
-            <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-950 flex items-center justify-center">
-              <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
-            </span>
-          </div>
+          <div className="h-6 w-px bg-white/10 hidden sm:block" />
 
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-headline text-base sm:text-lg font-bold text-white leading-tight">
-                Anita Ma'am
-              </h1>
-              <Badge variant="saffron" className="text-[10px] py-0 px-2">
-                AI Teacher Agent
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-              <span>Class 8 Socratic Mentor</span>
-              <span>·</span>
-              <span className="text-emerald-400 flex items-center gap-1 font-medium">
-                <Save className="w-3 h-3" /> Auto-saved in Local Storage
+          {/* Anita Ma'am Identity */}
+          <div className="flex items-center gap-3">
+            <div className="relative shrink-0">
+              <img
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuArQo7uLrplNf5RxigElyfquxORgDVwRiffuHJLlp8TO0VBqan1Pd2RJ0ZM5dhdFpN_me1a7GTtlyN_0jXgZ34yw8j8M30zHK1PlUlR2LgCG1AODsYRBaUp9E9n1aMGByMRuNPigKPjhw9T--SYAjFwKaPOkNzt6KlG7BipfkvCL4hFtcNQiIOFFOHq1frIxTXoHhyRnHxTzfnBxMBQeeT1qB-Gb9EoYA0u-301NUCrmI-bRFqS9erg"
+                alt="Anita Ma'am"
+                className="w-10 h-10 rounded-2xl object-cover border border-amber-500/50 shadow-md ring-2 ring-amber-500/20"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-950 flex items-center justify-center">
+                <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
               </span>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-headline text-sm sm:text-base font-bold text-white tracking-tight">
+                  Anita Ma'am
+                </h1>
+                <Badge variant="saffron" className="text-[10px] py-0 px-2 font-semibold hidden xs:inline-flex">
+                  AI Teacher
+                </Badge>
+              </div>
+              <p className="text-[11px] text-slate-400 flex items-center gap-1.5 leading-none mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                <span>Active 1-on-1 Mentor</span>
+                <span className="hidden sm:inline">· Class 8</span>
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Controls: Audio Settings, Language, Clear */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          {/* Test Sound & Voice Settings */}
+        {/* Center: Subject Selection Pills (hidden on mobile, visible on tablet+) */}
+        <div className="hidden lg:flex items-center gap-1 p-1 rounded-2xl bg-slate-900/80 border border-white/5">
+          {subjects.map((sub) => {
+            const Icon = sub.icon;
+            const isSelected = selectedSubject === sub.id;
+            return (
+              <button
+                key={sub.id}
+                onClick={() => setSelectedSubject(sub.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{sub.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right: Audio Settings, Language, New Chat */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Language Toggle */}
+          <div className="flex rounded-xl bg-slate-900 border border-white/10 p-0.5 text-xs">
+            {(['English', 'Hindi', 'Hinglish'] as const).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setSelectedLanguage(lang)}
+                className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                  selectedLanguage === lang
+                    ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {lang}
+              </button>
+            ))}
+          </div>
+
+          {/* Voice Controls Popover Toggle */}
           <button
             onClick={() => setVoiceSettingsOpen(!voiceSettingsOpen)}
             className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               voiceSettingsOpen || isSpeakingId
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md shadow-amber-950/40'
-                : 'bg-slate-800/80 text-slate-300 border-white/10 hover:border-amber-500/40 hover:text-white'
+                : 'bg-slate-900 text-slate-300 border-white/10 hover:border-amber-500/40 hover:text-white'
             }`}
-            title="Audio & Voice Controls"
+            title="Voice Speed & Audio Settings"
           >
             {isSpeakingId ? (
               <span className="relative flex h-2 w-2">
@@ -319,72 +398,35 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
             ) : (
               <Volume2 className="w-3.5 h-3.5 text-amber-400" />
             )}
-            <span className="hidden sm:inline">Voice & Audio</span>
+            <span className="hidden sm:inline">Voice</span>
           </button>
 
-          {/* Quick Voice Sound Test Button */}
-          <button
-            onClick={handleRunVoiceTest}
-            disabled={isTestingVoice}
-            className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
-            title="Test Voice Audio immediately"
-          >
-            <Radio className={`w-3.5 h-3.5 ${isTestingVoice ? 'animate-spin' : ''}`} />
-            <span className="hidden md:inline">Test Sound</span>
-          </button>
-
-          {/* Language Selector */}
-          <div className="flex rounded-xl bg-slate-950/70 border border-white/10 p-0.5 text-xs">
-            {(['English', 'Hindi', 'Hinglish'] as const).map((lang) => (
-              <button
-                key={lang}
-                onClick={() => setSelectedLanguage(lang)}
-                className={`px-2 py-1 rounded-lg text-xs transition-all cursor-pointer ${
-                  selectedLanguage === lang
-                    ? 'bg-amber-600 text-white font-bold shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {lang}
-              </button>
-            ))}
-          </div>
-
-          {/* Clear Thread */}
+          {/* New Chat / Reset */}
           <button
             onClick={handleClearHistory}
-            className="p-1.5 rounded-xl bg-slate-800/80 border border-white/10 text-slate-400 hover:text-rose-400 hover:border-rose-500/30 transition-colors flex items-center gap-1 text-xs cursor-pointer"
-            title="Clear Chat History from Local Storage"
+            className="p-2 rounded-xl bg-slate-900 border border-white/10 text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors cursor-pointer"
+            title="Start New Conversation"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <RotateCcw className="w-4 h-4" />
           </button>
         </div>
       </header>
 
-      {/* Voice & Sound Settings Drawer Card (when toggled open) */}
+      {/* Voice Settings Flyout Drawer */}
       {voiceSettingsOpen && (
-        <Card className="shrink-0 mb-3 border-amber-500/30 bg-slate-900/95 backdrop-blur-2xl p-4 animate-in slide-in-from-top-3 duration-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-amber-400" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 font-headline">
-                  Speech & Sound Settings
-                </h4>
-                <Badge variant="teal" className="text-[10px] py-0 px-2">
-                  Dual-Engine: WebSpeech + Acoustic Formant
-                </Badge>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Audio is enabled for browser iframes, mobile devices, and headphones. Click test to verify your speaker sound.
-              </p>
+        <div className="shrink-0 bg-slate-900/95 backdrop-blur-2xl border-b border-white/10 px-4 py-3 z-20 animate-in slide-in-from-top-2">
+          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold text-slate-200">Teacher Voice Preferences</span>
+              <span className="text-[11px] text-slate-400">· Adjust speed and volume to suit your study pace</span>
             </div>
 
             <div className="flex flex-wrap items-center gap-4">
               {/* Volume Slider */}
-              <div className="flex items-center gap-2 min-w-[140px]">
+              <div className="flex items-center gap-2 min-w-[130px]">
                 <Volume2 className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[11px] text-slate-400 w-8">Vol:</span>
+                <span className="text-[11px] text-slate-400">Volume:</span>
                 <Slider
                   min={0.1}
                   max={1.0}
@@ -392,7 +434,7 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
                   value={speechVolume}
                   onValueChange={(val) => setSpeechVolume(val)}
                   label="Speech Volume"
-                  className="w-24"
+                  className="w-20"
                 />
                 <span className="text-[11px] font-mono text-amber-400">
                   {Math.round(speechVolume * 100)}%
@@ -400,7 +442,7 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
               </div>
 
               {/* Speed Buttons */}
-              <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-white/10 text-xs">
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-white/10 text-xs">
                 <span className="text-[10px] text-slate-400 px-1 font-medium">Speed:</span>
                 {[0.8, 0.95, 1.15].map((rate) => (
                   <button
@@ -417,46 +459,80 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
                 ))}
               </div>
 
-              {/* Direct Test Button */}
+              {/* Test Audio Button */}
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleRunVoiceTest}
                 disabled={isTestingVoice}
-                className="text-xs gap-1.5"
+                className="text-xs gap-1.5 h-7"
               >
                 <Play className="w-3 h-3 text-emerald-400 fill-emerald-400" />
-                <span>{isTestingVoice ? 'Playing...' : 'Play Test Sample'}</span>
+                <span>{isTestingVoice ? 'Playing...' : 'Test Voice'}</span>
               </Button>
-            </div>
-          </div>
-        </Card>
-      )}
 
-      {/* Suggested Quick Starters (if conversation is fresh) */}
-      {messages.length <= 2 && (
-        <div className="shrink-0 mb-3">
-          <div className="flex items-center gap-1.5 text-xs text-amber-400 font-semibold mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Suggested Student Questions</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {quickPrompts.map((prompt, idx) => (
+              {/* Close flyout */}
               <button
-                key={idx}
-                onClick={() => handleSend(prompt)}
-                className="p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-white/10 hover:border-amber-500/40 text-left text-xs text-slate-300 hover:text-white transition-all flex items-center justify-between group cursor-pointer"
+                onClick={() => setVoiceSettingsOpen(false)}
+                className="text-xs text-slate-400 hover:text-white font-medium px-2 py-1"
               >
-                <span className="truncate pr-2">{prompt}</span>
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 opacity-60 group-hover:opacity-100 shrink-0" />
+                Done
               </button>
-            ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Conversation Thread - Scrollable and fills remaining space */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-1 p-2 rounded-2xl border border-white/5 bg-slate-950/40 backdrop-blur-sm">
+      {/* Subject Filter Bar for Mobile/Tablet */}
+      <div className="lg:hidden shrink-0 flex items-center gap-1.5 px-3 py-2 bg-slate-950/60 border-b border-white/5 overflow-x-auto no-scrollbar">
+        {subjects.map((sub) => {
+          const Icon = sub.icon;
+          const isSelected = selectedSubject === sub.id;
+          return (
+            <button
+              key={sub.id}
+              onClick={() => setSelectedSubject(sub.id)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                isSelected
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  : 'text-slate-400 hover:text-slate-200 bg-slate-900/60 border border-white/5'
+              }`}
+            >
+              <Icon className="w-3 h-3" />
+              <span>{sub.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Main Chat Scroll Container - Fills Viewport */}
+      <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4 max-w-4xl mx-auto w-full select-text">
+        {/* Suggestion Starter Cards if chat is fresh */}
+        {messages.length <= 2 && (
+          <div className="mb-4 p-4 rounded-3xl bg-gradient-to-b from-amber-500/10 via-slate-900/60 to-slate-900/40 border border-amber-500/20">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
+                <Sparkles className="w-4 h-4" />
+                <span>Explore with Anita Ma'am ({selectedSubject})</span>
+              </div>
+              <span className="text-[11px] text-slate-400">Tap any question to ask</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {activePrompts.map((prompt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSend(prompt)}
+                  className="p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800/80 border border-white/10 hover:border-amber-500/40 text-left text-xs text-slate-300 hover:text-white transition-all flex items-center justify-between group cursor-pointer shadow-sm"
+                >
+                  <span className="pr-2 leading-relaxed">{prompt}</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 opacity-60 group-hover:opacity-100 shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Message Stream */}
         {messages.map((msg) => {
           const isTeacher = msg.sender === 'teacher';
           const isCurrentlySpeakingThis = isSpeakingId === msg.id;
@@ -469,7 +545,7 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
               }`}
             >
               {isTeacher && (
-                <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-500/40 shrink-0 shadow-md mt-1">
+                <div className="w-9 h-9 rounded-2xl overflow-hidden border border-amber-500/40 shrink-0 shadow-md mt-1">
                   <img
                     src="https://lh3.googleusercontent.com/aida-public/AB6AXuArQo7uLrplNf5RxigElyfquxORgDVwRiffuHJLlp8TO0VBqan1Pd2RJ0ZM5dhdFpN_me1a7GTtlyN_0jXgZ34yw8j8M30zHK1PlUlR2LgCG1AODsYRBaUp9E9n1aMGByMRuNPigKPjhw9T--SYAjFwKaPOkNzt6KlG7BipfkvCL4hFtcNQiIOFFOHq1frIxTXoHhyRnHxTzfnBxMBQeeT1qB-Gb9EoYA0u-301NUCrmI-bRFqS9erg"
                     alt="Anita Ma'am"
@@ -479,52 +555,67 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
               )}
 
               <div
-                className={`max-w-[88%] md:max-w-[82%] rounded-2xl p-4 shadow-xl text-sm leading-relaxed relative group transition-all ${
+                className={`max-w-[92%] sm:max-w-[85%] md:max-w-[78%] rounded-3xl p-4 sm:p-5 shadow-xl text-sm leading-relaxed relative group transition-all ${
                   isTeacher
                     ? isCurrentlySpeakingThis
-                      ? 'glass-card border-amber-500/50 bg-slate-900/90 text-slate-100 rounded-tl-sm ring-1 ring-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
-                      : 'glass-card border-white/10 text-slate-100 rounded-tl-sm'
-                    : 'bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-tr-sm shadow-md'
+                      ? 'bg-slate-900/95 border border-amber-500/50 text-slate-100 rounded-tl-sm ring-1 ring-amber-500/40 shadow-[0_0_25px_rgba(245,158,11,0.15)]'
+                      : 'bg-slate-900/80 border border-white/10 text-slate-100 rounded-tl-sm backdrop-blur-md'
+                    : 'bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-tr-sm shadow-md shadow-orange-950/40'
                 }`}
               >
-                {/* Render via MarkdownRenderer so LaTeX, bold, equations, lists, and steps look crisp */}
+                {/* Content */}
                 <MarkdownRenderer content={msg.text} />
 
-                {/* Footer metadata & Speech button */}
+                {/* Footer Toolbar */}
                 <div
-                  className={`mt-3 flex items-center justify-between text-[11px] border-t border-white/10 pt-2 ${
-                    isTeacher ? 'text-slate-400' : 'text-amber-100'
+                  className={`mt-3 pt-2.5 flex items-center justify-between text-[11px] border-t ${
+                    isTeacher ? 'border-white/10 text-slate-400' : 'border-white/20 text-amber-100'
                   }`}
                 >
                   <span className="tabular-nums font-mono text-[10px]">{msg.timestamp}</span>
 
                   {isTeacher && (
-                    <button
-                      onClick={() => handleSpeakMessage(msg.text, msg.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                        isCurrentlySpeakingThis
-                          ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-950/50 scale-105 ring-2 ring-amber-400'
-                          : 'bg-white/10 hover:bg-white/20 text-slate-200 hover:text-amber-300'
-                      }`}
-                      title={isCurrentlySpeakingThis ? 'Pause / Stop speaking' : 'Read aloud with AI teacher voice'}
-                    >
-                      {isCurrentlySpeakingThis ? (
-                        <>
-                          {/* Animated equalizer waves */}
-                          <div className="flex items-center gap-0.5 h-3">
-                            <span className="w-0.5 h-3 bg-slate-950 animate-[pulse_0.4s_infinite]" />
-                            <span className="w-0.5 h-2 bg-slate-950 animate-[pulse_0.6s_infinite]" />
-                            <span className="w-0.5 h-3.5 bg-slate-950 animate-[pulse_0.5s_infinite]" />
-                          </div>
-                          <span>Speaking... (Stop)</span>
-                        </>
-                      ) : (
-                        <>
-                          <Volume2 className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Listen to Ma'am</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* Copy */}
+                      <button
+                        onClick={() => handleCopy(msg.id, msg.text)}
+                        className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                        title="Copy text"
+                      >
+                        {copiedId === msg.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+
+                      {/* Listen button */}
+                      <button
+                        onClick={() => handleSpeakMessage(msg.text, msg.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                          isCurrentlySpeakingThis
+                            ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-950/50 ring-2 ring-amber-400'
+                            : 'bg-white/10 hover:bg-white/20 text-slate-200 hover:text-amber-300'
+                        }`}
+                        title={isCurrentlySpeakingThis ? 'Pause / Stop speaking' : 'Read aloud with AI teacher voice'}
+                      >
+                        {isCurrentlySpeakingThis ? (
+                          <>
+                            <div className="flex items-center gap-0.5 h-3">
+                              <span className="w-0.5 h-3 bg-slate-950 animate-[pulse_0.4s_infinite]" />
+                              <span className="w-0.5 h-2 bg-slate-950 animate-[pulse_0.6s_infinite]" />
+                              <span className="w-0.5 h-3.5 bg-slate-950 animate-[pulse_0.5s_infinite]" />
+                            </div>
+                            <span>Speaking...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Listen to Ma'am</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -534,17 +625,17 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
 
         {/* Loading Indicator */}
         {loading && (
-          <div className="flex items-start gap-3 justify-start">
-            <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-500/40 shrink-0 shadow-md mt-1">
+          <div className="flex items-start gap-3 justify-start animate-in fade-in">
+            <div className="w-9 h-9 rounded-2xl overflow-hidden border border-amber-500/40 shrink-0 shadow-md mt-1">
               <img
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuArQo7uLrplNf5RxigElyfquxORgDVwRiffuHJLlp8TO0VBqan1Pd2RJ0ZM5dhdFpN_me1a7GTtlyN_0jXgZ34yw8j8M30zHK1PlUlR2LgCG1AODsYRBaUp9E9n1aMGByMRuNPigKPjhw9T--SYAjFwKaPOkNzt6KlG7BipfkvCL4hFtcNQiIOFFOHq1frIxTXoHhyRnHxTzfnBxMBQeeT1qB-Gb9EoYA0u-301NUCrmI-bRFqS9erg"
                 alt="Anita Ma'am"
                 className="w-full h-full object-cover animate-pulse"
               />
             </div>
-            <div className="p-4 rounded-2xl glass-card border-white/10 rounded-tl-sm flex items-center gap-2.5 text-xs text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-              <span>Anita Ma'am is preparing a clear, step-by-step Socratic response...</span>
+            <div className="p-4 rounded-3xl bg-slate-900/80 border border-white/10 rounded-tl-sm flex items-center gap-3 text-xs text-slate-300">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+              <span>Anita Ma'am is preparing your step-by-step guidance...</span>
             </div>
           </div>
         )}
@@ -554,80 +645,86 @@ export function TeacherAgentChatScreen({ onNavigate }: TeacherAgentChatScreenPro
 
       {/* Floating Active Speech Player Status Bar (when audio is active) */}
       {isSpeakingId && (
-        <div className="shrink-0 mt-2 mb-1 p-2.5 rounded-2xl bg-gradient-to-r from-amber-950/90 to-slate-900/90 border border-amber-500/40 shadow-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2">
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0 border border-amber-500/30">
-              <Volume2 className="w-4 h-4 text-amber-400 animate-pulse" />
-            </div>
-            <div className="overflow-hidden">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-amber-300">
-                  Anita Ma'am Speaking
-                </span>
-                {sentenceProgress.total > 0 && (
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    Part {sentenceProgress.index} of {sentenceProgress.total}
-                  </span>
-                )}
+        <div className="shrink-0 px-3 sm:px-6">
+          <div className="max-w-4xl mx-auto p-2.5 rounded-2xl bg-gradient-to-r from-amber-950/90 via-slate-900/90 to-slate-900/90 border border-amber-500/40 shadow-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-7 h-7 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0 border border-amber-500/30">
+                <Volume2 className="w-4 h-4 text-amber-400 animate-pulse" />
               </div>
-              <p className="text-[11px] text-slate-300 truncate italic">
-                "{currentSpokenSentence || 'Speaking educational guidance...'}"
-              </p>
+              <div className="overflow-hidden">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-amber-300">
+                    Anita Ma'am is Explaining
+                  </span>
+                  {sentenceProgress.total > 0 && (
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Part {sentenceProgress.index} of {sentenceProgress.total}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-300 truncate italic">
+                  "{currentSpokenSentence || 'Speaking educational guidance...'}"
+                </p>
+              </div>
             </div>
-          </div>
 
-          <button
-            onClick={handleStopSpeech}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/80 border border-white/10 hover:border-rose-500/40 text-slate-200 hover:text-rose-300 text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
-          >
-            <Square className="w-3 h-3 fill-current" />
-            <span>Stop Audio</span>
-          </button>
+            <button
+              onClick={handleStopSpeech}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/80 border border-white/10 hover:border-rose-500/40 text-slate-200 hover:text-rose-300 text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              <span>Stop Audio</span>
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Docked Input Area */}
-      <div className="shrink-0 pt-2">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="flex items-center gap-2"
-        >
-          <div className="relative flex-1">
-            <Input
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ask Anita Ma'am anything (e.g. 2x² + 5x = 0, zinc + HCl reaction, pythagoras)..."
-              disabled={loading}
-              className="pr-10 text-xs sm:text-sm py-2.5"
-            />
-          </div>
-
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            glow
-            disabled={!inputText.trim() || loading}
-            className="px-5 shrink-0"
+      {/* Docked Prompt Input Bar */}
+      <footer className="shrink-0 border-t border-white/10 bg-slate-950/95 backdrop-blur-2xl p-3 sm:p-4 z-30">
+        <div className="max-w-4xl mx-auto w-full">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="flex items-center gap-2"
           >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Ask Ma'am</span>
-          </Button>
-        </form>
+            <div className="relative flex-1">
+              <Input
+                ref={inputRef}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder={`Ask Anita Ma'am anything in ${selectedSubject}... (e.g. 2x² + 5x = 0, zinc + HCl)`}
+                disabled={loading}
+                className="pr-10 text-xs sm:text-sm py-3 bg-slate-900/90 border-white/10 focus:border-amber-500/50 rounded-2xl"
+              />
+            </div>
 
-        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 px-1">
-          <span className="flex items-center gap-1 text-emerald-400">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Chat & audio history stored in local storage</span>
-          </span>
-          <span className="flex items-center gap-1 text-amber-400 font-semibold">
-            <Flame className="w-3.5 h-3.5" /> +5 XP per question
-          </span>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              glow
+              disabled={!inputText.trim() || loading}
+              className="px-5 shrink-0 h-11 rounded-2xl cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+              <span className="hidden sm:inline">Ask Ma'am</span>
+            </Button>
+          </form>
+
+          {/* Student reassurance sub-row - completely free of tech jargon */}
+          <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 px-1">
+            <span className="flex items-center gap-1 text-slate-300">
+              <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+              <span>Socratic step-by-step guidance · Ask as many questions as you like</span>
+            </span>
+            <span className="flex items-center gap-1 text-amber-400 font-semibold">
+              <Flame className="w-3.5 h-3.5" /> +5 XP per question
+            </span>
+          </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

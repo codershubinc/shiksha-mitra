@@ -47,8 +47,8 @@ function AppContent() {
 
   return (
     <div className="min-h-screen relative overflow-x-hidden bg-[#070b14] text-slate-100 flex flex-col">
-      {/* Top Navigation - sticky in normal flow, so content naturally sits immediately below it */}
-      {currentScreen !== 'bulk-scanning' && currentScreen !== 'exam' && (
+      {/* Top Navigation - hidden in full screen modes (AI teacher, exam, bulk scanner) */}
+      {currentScreen !== 'bulk-scanning' && currentScreen !== 'exam' && currentScreen !== 'teacher-agent-chat' && (
         <TopNavBar
           currentScreen={currentScreen}
           onNavigate={setCurrentScreen}
@@ -57,8 +57,16 @@ function AppContent() {
         />
       )}
 
-      {/* Main View Router - with generous margin and bottom clearance */}
-      <main className="w-full flex-1 pt-2 sm:pt-4 pb-32 lg:pb-16">
+      {/* Main View Router */}
+      <main
+        className={
+          currentScreen === 'teacher-agent-chat'
+            ? 'w-full h-dvh flex flex-col overflow-hidden p-0'
+            : currentScreen === 'exam' || currentScreen === 'bulk-scanning'
+            ? 'w-full flex-1 p-0'
+            : 'w-full flex-1 pt-2 sm:pt-4 pb-32 lg:pb-16'
+        }
+      >
         {currentScreen === 'dashboard' && (
           <StudentDashboardScreen
             onNavigate={setCurrentScreen}
@@ -90,53 +98,57 @@ function AppContent() {
         )}
       </main>
 
-      {/* Bottom Navigation for Mobile */}
-      <BottomNavBar
-        currentScreen={currentScreen}
-        onNavigate={setCurrentScreen}
-        onOpenProfile={() => setProfileOpen(true)}
-      />
+      {/* Bottom Navigation for Mobile (hidden in full-screen teacher chat, exam, bulk scanner) */}
+      {currentScreen !== 'bulk-scanning' && currentScreen !== 'exam' && currentScreen !== 'teacher-agent-chat' && (
+        <BottomNavBar
+          currentScreen={currentScreen}
+          onNavigate={setCurrentScreen}
+          onOpenProfile={() => setProfileOpen(true)}
+        />
+      )}
 
-      {/* Screen Navigator Quick Launcher Pill (Positioned above mobile bottom bar) */}
-      <div className="fixed bottom-22 lg:bottom-4 right-4 z-30">
-        <div className="relative">
-          <button
-            onClick={() => setScreenSelectorOpen(!screenSelectorOpen)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-slate-900/90 backdrop-blur-xl border border-amber-500/40 text-amber-300 text-xs font-semibold shadow-2xl hover:bg-slate-800 transition-all active:scale-95 cursor-pointer"
-          >
-            <LayoutGrid className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">12 Screens Index</span>
-          </button>
+      {/* Screen Navigator Quick Launcher Pill (hidden during full-screen teacher chat to prevent obstructing input) */}
+      {currentScreen !== 'teacher-agent-chat' && (
+        <div className="fixed bottom-22 lg:bottom-4 right-4 z-30">
+          <div className="relative">
+            <button
+              onClick={() => setScreenSelectorOpen(!screenSelectorOpen)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-slate-900/90 backdrop-blur-xl border border-amber-500/40 text-amber-300 text-xs font-semibold shadow-2xl hover:bg-slate-800 transition-all active:scale-95 cursor-pointer"
+            >
+              <LayoutGrid className="w-4 h-4 text-amber-400" />
+              <span className="hidden sm:inline">12 Screens Index</span>
+            </button>
 
-          {screenSelectorOpen && (
-            <div className="absolute bottom-12 right-0 w-72 max-h-96 overflow-y-auto glass-panel p-3 rounded-2xl border border-white/15 shadow-2xl space-y-1 animate-in zoom-in-95">
-              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                <span>Jump to Screen</span>
-                <span className="text-[10px] text-amber-400 font-mono">12 of 12</span>
+            {screenSelectorOpen && (
+              <div className="absolute bottom-12 right-0 w-72 max-h-96 overflow-y-auto glass-panel p-3 rounded-2xl border border-white/15 shadow-2xl space-y-1 animate-in zoom-in-95">
+                <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                  <span>Jump to Screen</span>
+                  <span className="text-[10px] text-amber-400 font-mono">12 of 12</span>
+                </div>
+                {screens.map((scr) => (
+                  <button
+                    key={scr.id}
+                    onClick={() => {
+                      setCurrentScreen(scr.id);
+                      setScreenSelectorOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
+                      currentScreen === scr.id
+                        ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                        : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <span className="truncate">{scr.label}</span>
+                    <span className="text-[10px] text-slate-500 shrink-0 font-medium">
+                      {scr.badge}
+                    </span>
+                  </button>
+                ))}
               </div>
-              {screens.map((scr) => (
-                <button
-                  key={scr.id}
-                  onClick={() => {
-                    setCurrentScreen(scr.id);
-                    setScreenSelectorOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
-                    currentScreen === scr.id
-                      ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
-                      : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  <span className="truncate">{scr.label}</span>
-                  <span className="text-[10px] text-slate-500 shrink-0 font-medium">
-                    {scr.badge}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Auth Modal */}
       <AuthModal />

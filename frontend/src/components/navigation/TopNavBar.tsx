@@ -12,7 +12,6 @@ import {
   BarChart2,
   GitBranch,
   LogIn,
-  Database,
 } from 'lucide-react';
 import { ScreenId } from '../../types';
 
@@ -77,18 +76,8 @@ export function TopNavBar({ currentScreen, onNavigate, onOpenProfile, onOpenAwsM
         })}
       </nav>
 
-      {/* Zone 3: Actions (AWS DB, Theme Toggle & Auth) */}
+      {/* Zone 3: Actions (Theme Toggle & Auth) */}
       <div className="flex items-center gap-2 sm:gap-2.5">
-        {/* AWS DynamoDB Free-Tier Hub Launcher */}
-        <button
-          onClick={onOpenAwsModal}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
-          title="Amazon DynamoDB (AWS Free-Tier NoSQL Database)"
-        >
-          <Database className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden sm:inline">AWS DB (Free)</span>
-        </button>
-
         {/* Bulk Scanner quick launcher */}
         <button
           onClick={() => onNavigate('bulk-scanning')}
