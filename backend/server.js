@@ -1,4 +1,4 @@
-// backend/server.ts
+// server.ts
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -7,7 +7,7 @@ import path2 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 import mongoose4 from "mongoose";
 
-// backend/config/env.ts
+// config/env.ts
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -28,13 +28,13 @@ var config = {
   mongoUri: process.env.MONGODB_URI || "mongodb://localhost:27017/shiksha-mitra"
 };
 
-// backend/routes/index.ts
+// routes/index.ts
 import { Router as Router5 } from "express";
 
-// backend/routes/auth.routes.ts
+// routes/auth.routes.ts
 import { Router } from "express";
 
-// backend/utils/crypto.utils.ts
+// utils/crypto.utils.ts
 import crypto from "node:crypto";
 function generateToken() {
   return crypto.randomBytes(32).toString("hex");
@@ -44,7 +44,7 @@ function sanitizeUser(user) {
   return safeUser;
 }
 
-// backend/services/cognito.service.ts
+// services/cognito.service.ts
 import {
   CognitoIdentityProviderClient,
   SignUpCommand,
@@ -135,7 +135,7 @@ var cognitoService = {
   }
 };
 
-// backend/models/user.model.ts
+// models/user.model.ts
 import mongoose, { Schema } from "mongoose";
 var UserSchema = new Schema({
   id: { type: String, required: true, unique: true },
@@ -154,7 +154,7 @@ var UserSchema = new Schema({
 });
 var UserModel = mongoose.models.User || mongoose.model("User", UserSchema);
 
-// backend/models/session.model.ts
+// models/session.model.ts
 import mongoose2, { Schema as Schema2 } from "mongoose";
 var SessionSchema = new Schema2({
   token: { type: String, required: true, unique: true },
@@ -163,7 +163,7 @@ var SessionSchema = new Schema2({
 });
 var SessionModel = mongoose2.models.Session || mongoose2.model("Session", SessionSchema);
 
-// backend/controllers/auth.controller.ts
+// controllers/auth.controller.ts
 import crypto3 from "node:crypto";
 async function createUserRecord(name, email, role, grade = "Class 8", rollNo, avatar, streak = 7, xp = 450) {
   const normalizedEmail = email.toLowerCase().trim();
@@ -364,7 +364,7 @@ var authController = {
   }
 };
 
-// backend/routes/auth.routes.ts
+// routes/auth.routes.ts
 var router = Router();
 router.post("/signup", authController.signup);
 router.post("/login", authController.login);
@@ -374,10 +374,10 @@ router.get("/students", authController.getStudents);
 router.post("/link-student", authController.linkStudent);
 var auth_routes_default = router;
 
-// backend/routes/ai.routes.ts
+// routes/ai.routes.ts
 import { Router as Router2 } from "express";
 
-// backend/services/gemini.service.ts
+// services/gemini.service.ts
 import { GoogleGenAI } from "@google/genai";
 import dotenv2 from "dotenv";
 dotenv2.config();
@@ -471,7 +471,7 @@ So 456 \xF7 12 = **38** with zero remainder! Did that step make sense?`;
 What is the very first step you feel confident trying here?`;
 }
 
-// backend/controllers/ai.controller.ts
+// controllers/ai.controller.ts
 var aiController = {
   async generateFlashcardExplanation(req, res) {
     const { formula, title, def } = req.body;
@@ -664,7 +664,7 @@ Output a concise 2-sentence diagnostic identifying:
   }
 };
 
-// backend/routes/ai.routes.ts
+// routes/ai.routes.ts
 var router2 = Router2();
 router2.post("/teacher-chat", aiController.teacherChatStream);
 router2.post("/socratic-hint", aiController.socraticHint);
@@ -675,10 +675,10 @@ router2.post("/flashcard-explanation", aiController.generateFlashcardExplanation
 router2.post("/generate-targeted-flashcards", aiController.generateTargetedFlashcards);
 var ai_routes_default = router2;
 
-// backend/routes/aws.routes.ts
+// routes/aws.routes.ts
 import { Router as Router3 } from "express";
 
-// backend/services/dynamodb.service.ts
+// services/dynamodb.service.ts
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
@@ -874,7 +874,7 @@ var dynamoService = {
   }
 };
 
-// backend/controllers/aws.controller.ts
+// controllers/aws.controller.ts
 var awsController = {
   async getStatus(_req, res) {
     try {
@@ -949,7 +949,7 @@ var awsController = {
   }
 };
 
-// backend/routes/aws.routes.ts
+// routes/aws.routes.ts
 var router3 = Router3();
 router3.get("/status", awsController.getStatus);
 router3.post("/test", awsController.testConnection);
@@ -958,10 +958,10 @@ router3.post("/save-record", awsController.saveRecord);
 router3.post("/sync", awsController.syncData);
 var aws_routes_default = router3;
 
-// backend/routes/quiz.routes.ts
+// routes/quiz.routes.ts
 import { Router as Router4 } from "express";
 
-// backend/models/quiz.model.ts
+// models/quiz.model.ts
 import mongoose3, { Schema as Schema3 } from "mongoose";
 var QuestionSchema = new Schema3({
   questionText: { type: String, required: true },
@@ -991,7 +991,7 @@ var ExamAttemptSchema = new Schema3({
 });
 var ExamAttemptModel = mongoose3.models.ExamAttempt || mongoose3.model("ExamAttempt", ExamAttemptSchema);
 
-// backend/controllers/quiz.controller.ts
+// controllers/quiz.controller.ts
 var quizController = {
   async getAllQuizzes(req, res) {
     try {
@@ -1074,7 +1074,7 @@ var quizController = {
   }
 };
 
-// backend/routes/quiz.routes.ts
+// routes/quiz.routes.ts
 var router4 = Router4();
 router4.get("/all", quizController.getAllQuizzes);
 router4.get("/:subjectId", quizController.getQuiz);
@@ -1082,7 +1082,7 @@ router4.post("/:subjectId/submit", quizController.submitAttempt);
 router4.get("/reports/all", quizController.getReports);
 var quiz_routes_default = router4;
 
-// backend/routes/index.ts
+// routes/index.ts
 var router5 = Router5();
 router5.use("/auth", auth_routes_default);
 router5.use("/ai", ai_routes_default);
@@ -1090,7 +1090,7 @@ router5.use("/aws", aws_routes_default);
 router5.use("/quiz", quiz_routes_default);
 var routes_default = router5;
 
-// backend/server.ts
+// server.ts
 mongoose4.connect(config.mongoUri).then(() => {
   console.log("[Shiksha Mitra AI] Connected to MongoDB");
 }).catch((err) => {
