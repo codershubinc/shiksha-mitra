@@ -39,7 +39,7 @@ export function TopNavBar({ currentScreen, onNavigate, onOpenProfile, onOpenAwsM
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-xl border-b border-white/10 h-16 px-4 md:px-8 flex items-center justify-between shrink-0 shadow-md">
+    <header className="sticky top-0 z-40 w-full bg-slate-950/95 backdrop-blur-2xl border-b border-white/10 h-16 px-4 md:px-8 flex items-center justify-between shrink-0 shadow-xl mb-4 sm:mb-6">
       {/* Zone 1: Brand Wordmark */}
       <div className="flex items-center gap-3">
         <button

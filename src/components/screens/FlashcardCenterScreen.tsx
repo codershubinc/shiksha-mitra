@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
+import { playTeacherSpeech, stopTeacherSpeech } from '../../lib/speech';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import {
   ArrowLeft,
@@ -60,16 +61,15 @@ export function FlashcardCenterScreen({ onNavigate }: FlashcardCenterScreenProps
 
   const handleAudio = () => {
     setIsPlayingAudio(true);
-    // Use Web Speech API if supported
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(
-        `Pythagorean Theorem: a squared plus b squared equals c squared. काटकोन त्रिकोणात कर्णाचा वर्ग हा इतर दोन बाजूंच्या वर्गांच्या बेरजेइतका असतो.`
-      );
-      utterance.onend = () => setIsPlayingAudio(false);
-      window.speechSynthesis.speak(utterance);
-    } else {
-      setTimeout(() => setIsPlayingAudio(false), 2000);
-    }
+    playTeacherSpeech(
+      `Pythagorean Theorem: a squared plus b squared equals c squared. In a right angled triangle, the square of the hypotenuse is equal to the sum of the squares of the other two sides.`,
+      {
+        language: 'English',
+        onStart: () => setIsPlayingAudio(true),
+        onEnd: () => setIsPlayingAudio(false),
+        onError: () => setIsPlayingAudio(false),
+      }
+    );
   };
 
   const handleRating = (difficulty: 'hard' | 'good' | 'easy') => {
@@ -96,7 +96,7 @@ For example, with sides 3 meters and 4 meters: 3² + 4² = 9 + 16 = 25, so hypot
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-32 pt-4 px-4 max-w-3xl mx-auto w-full">
+    <div className="flex flex-col py-6 px-4 max-w-3xl mx-auto w-full">
       {/* Top Header */}
       <header className="py-3 border-b border-white/10 mb-4">
         <div className="flex items-center justify-between mb-3">

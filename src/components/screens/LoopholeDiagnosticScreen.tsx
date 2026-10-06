@@ -40,7 +40,7 @@ export function LoopholeDiagnosticScreen({ onNavigate }: LoopholeDiagnosticScree
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-44 pt-4 px-4 max-w-2xl mx-auto w-full">
+    <div className="flex flex-col py-6 px-4 max-w-2xl mx-auto w-full">
       {/* Top Header */}
       <header className="flex items-center justify-between py-3 border-b border-white/10 mb-4">
         <div className="flex items-center gap-3">
@@ -141,8 +141,8 @@ export function LoopholeDiagnosticScreen({ onNavigate }: LoopholeDiagnosticScree
         </div>
       </Card>
 
-      {/* Socratic Mentor Bottom Sheet Panel */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-2xl rounded-t-3xl border-t border-white/15 p-5 shadow-2xl max-w-2xl mx-auto">
+      {/* Socratic Mentor Socratic Interactive Panel */}
+      <div className="mt-6 rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 p-5 shadow-2xl max-w-2xl mx-auto w-full">
         <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-4" />
 
         <div className="flex items-center justify-between mb-3">

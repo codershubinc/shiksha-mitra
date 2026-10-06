@@ -89,4 +89,26 @@ export const api = {
     if (!res.ok) throw new Error(data.error || 'Failed to get teacher response');
     return data;
   },
+
+  // AWS DynamoDB Free-Tier Endpoints
+  async getAwsStatus() {
+    const res = await fetch('/api/aws/status');
+    return res.json();
+  },
+
+  async testAwsConnection() {
+    const res = await fetch('/api/aws/test', { method: 'POST' });
+    return res.json();
+  },
+
+  async getAwsRecords(pk?: string) {
+    const url = pk ? `/api/aws/records?pk=${encodeURIComponent(pk)}` : '/api/aws/records';
+    const res = await fetch(url);
+    return res.json();
+  },
+
+  async syncAwsData() {
+    const res = await fetch('/api/aws/sync', { method: 'POST' });
+    return res.json();
+  },
 };

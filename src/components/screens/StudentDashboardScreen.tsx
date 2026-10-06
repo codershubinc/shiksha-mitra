@@ -28,7 +28,7 @@ export function StudentDashboardScreen({ onNavigate, onOpenProfile }: StudentDas
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen flex flex-col pb-36 pt-6 px-4 max-w-4xl mx-auto w-full">
+    <div className="flex flex-col py-6 px-4 max-w-4xl mx-auto w-full">
       {/* Welcome & Stats Ribbon */}
       <section className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -206,19 +206,22 @@ export function StudentDashboardScreen({ onNavigate, onOpenProfile }: StudentDas
         </div>
       </Card>
 
-      {/* Floating Vernacular Mic Action Button */}
-      <div className="fixed bottom-24 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-2">
-          <button
-            onClick={() => onNavigate('teacher-agent-chat')}
-            className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white px-6 py-3.5 rounded-full shadow-[0_10px_35px_rgba(245,158,11,0.4)] border border-amber-400/40 flex items-center gap-2.5 hover:scale-105 active:scale-95 transition-all duration-300"
-          >
-            <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
-            <span className="font-headline font-bold text-xs md:text-sm">
-              Chat with Anita Ma'am (AI Teacher)
+      {/* Vernacular AI Teacher Hero Action Banner */}
+      <div className="mt-8 flex justify-center w-full">
+        <button
+          onClick={() => onNavigate('teacher-agent-chat')}
+          className="w-full sm:w-auto bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white px-8 py-4 rounded-2xl shadow-[0_10px_35px_rgba(245,158,11,0.35)] border border-amber-400/40 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all duration-300 cursor-pointer"
+        >
+          <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
+          <div className="text-left">
+            <span className="font-headline font-bold text-sm sm:text-base block">
+              Ask Anita Ma'am (AI Teacher Agent)
             </span>
-          </button>
-        </div>
+            <span className="text-[11px] text-amber-100 font-normal block">
+              Instant voice guidance, math step-by-step & exam doubts
+            </span>
+          </div>
+        </button>
       </div>
     </div>
   );

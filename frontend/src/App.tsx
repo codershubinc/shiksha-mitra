@@ -57,8 +57,8 @@ function AppContent() {
         />
       )}
 
-      {/* Main View Router - with generous bottom clearance for mobile bottom navbar */}
-      <main className="w-full flex-1 pb-28 lg:pb-10">
+      {/* Main View Router - with generous margin and bottom clearance */}
+      <main className="w-full flex-1 pt-2 sm:pt-4 pb-32 lg:pb-16">
         {currentScreen === 'dashboard' && (
           <StudentDashboardScreen
             onNavigate={setCurrentScreen}

@@ -69,7 +69,7 @@ export function SnapAndSolveScreen({ onNavigate }: SnapAndSolveScreenProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-28 pt-4 px-4 max-w-2xl mx-auto w-full">
+    <div className="flex flex-col py-6 px-4 max-w-2xl mx-auto w-full">
       {/* Top Header */}
       <header className="flex items-center justify-between py-3 mb-4 border-b border-white/10">
         <div className="flex items-center gap-3">
