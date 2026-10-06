@@ -1091,7 +1091,11 @@ router5.use("/quiz", quiz_routes_default);
 var routes_default = router5;
 
 // backend/server.ts
-mongoose4.set("bufferCommands", false);
+mongoose4.connect(config.mongoUri).then(() => {
+  console.log("[Shiksha Mitra AI] Connected to MongoDB");
+}).catch((err) => {
+  console.error("[Shiksha Mitra AI] MongoDB connection error:", err);
+});
 var __filename2 = fileURLToPath2(import.meta.url);
 var __dirname2 = path2.dirname(__filename2);
 var app = express();
@@ -1114,33 +1118,21 @@ app.get("/api/health", (_req, res) => {
 });
 async function startServer() {
   const isProduction = config.nodeEnv === "production" || process.env.NODE_ENV === "production";
-  if (!isProduction) {
-    app.use("*", async (req, res, next) => {
-      const url = req.originalUrl;
-      if (url.startsWith("/api")) {
-        return next();
-      }
-    });
-  }
-  try {
-    await mongoose4.connect(config.mongoUri);
-    console.log("[Shiksha Mitra AI] Connected to MongoDB");
-  } catch (error) {
-    console.error("[Shiksha Mitra AI] MongoDB connection error:", error);
-  }
   return httpServer.listen(config.port, "0.0.0.0", () => {
     console.log(
       `[Shiksha Mitra AI] backend running on http://localhost:${config.port} (${isProduction ? "production" : "development"})`
     );
   });
 }
-if (process.env.NODE_ENV !== "test") {
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
   startServer().catch((err) => {
     console.error("[Shiksha Mitra AI] Failed to start server:", err);
   });
 }
+var server_default = app;
 export {
   app,
+  server_default as default,
   httpServer,
   startServer
 };

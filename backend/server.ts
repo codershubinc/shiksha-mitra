@@ -6,10 +6,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
 
-mongoose.set('bufferCommands', false);
-
 import { config } from './config/env.js';
 import apiRoutes from './routes/index.js';
+
+// Global DB connection for Serverless environments
+mongoose.connect(config.mongoUri).then(() => {
+  console.log('[Shiksha Mitra AI] Connected to MongoDB');
+}).catch(err => {
+  console.error('[Shiksha Mitra AI] MongoDB connection error:', err);
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,22 +50,6 @@ export async function startServer() {
     config.nodeEnv === 'production' ||
     (process.env.NODE_ENV === 'production')
 
-  if (!isProduction) {
-    app.use('*', async (req, res, next) => {
-      const url = req.originalUrl;
-      if (url.startsWith('/api')) {
-        return next();
-      }
-    });
-  }
-
-  try {
-    await mongoose.connect(config.mongoUri);
-    console.log('[Shiksha Mitra AI] Connected to MongoDB');
-  } catch (error) {
-    console.error('[Shiksha Mitra AI] MongoDB connection error:', error);
-  }
-
   return httpServer.listen(config.port, '0.0.0.0', () => {
     console.log(
       `[Shiksha Mitra AI] backend running on http://localhost:${config.port} (${isProduction ? 'production' : 'development'})`
@@ -68,8 +57,11 @@ export async function startServer() {
   });
 }
 
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   startServer().catch((err) => {
     console.error('[Shiksha Mitra AI] Failed to start server:', err);
   });
 }
+
+// For Vercel Serverless Functions
+export default app;
