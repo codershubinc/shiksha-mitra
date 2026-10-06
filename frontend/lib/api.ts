@@ -226,6 +226,14 @@ export const api = {
     return res.json();
   },
 
+  async getAllQuizzes() {
+    const res = await fetch(url('/api/quiz/all'), {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch quizzes');
+    return res.json();
+  },
+
   async submitQuizAttempt(subjectId: string, answers: any[]) {
     const res = await fetch(url(`/api/quiz/${subjectId}/submit`), {
       method: 'POST',

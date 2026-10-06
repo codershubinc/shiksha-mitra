@@ -24,6 +24,11 @@ app.use(cors({ origin: true, credentials: true }));
 // Mount Central API Routes
 app.use('/api', apiRoutes);
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.send('hello from shiksha-mantra backend');
+});
+
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
   res.json({

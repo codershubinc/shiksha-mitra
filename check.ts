@@ -12,7 +12,7 @@ const checkData = async () => {
     await mongoose.connect(mongoUri);
     const quizzes = await QuizModel.find({});
     for (const q of quizzes) {
-      console.log(\`Subject: \${q.subjectId}, Questions: \${q.questions.length}\`);
+      console.log(`Subject: ${q.subjectId}, Questions: ${q.questions.length}`);
     }
   } catch (e) {
     console.error(e);

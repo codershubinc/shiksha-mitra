@@ -50,6 +50,9 @@ interface ExamModeScreenProps {
 
 export function ExamModeScreen({ onNavigate }: ExamModeScreenProps) {
   const { user, updateUserXp } = useAuth();
+  
+  const [subjects, setSubjects] = useState(mockSubjects);
+  
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(mockSubjects[0].id);
   const [isSelectingSubject, setIsSelectingSubject] = useState<boolean>(true);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
@@ -66,7 +69,24 @@ export function ExamModeScreen({ onNavigate }: ExamModeScreenProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [examResult, setExamResult] = useState<any>(null);
 
-  const currentSubject = mockSubjects.find((s) => s.id === selectedSubjectId) || mockSubjects[0];
+  useEffect(() => {
+    // Fetch actual quiz counts from backend
+    api.getAllQuizzes().then((remoteQuizzes: any[]) => {
+      setSubjects(prev => prev.map(sub => {
+        const remote = remoteQuizzes.find(rq => rq.id === sub.id);
+        if (remote) {
+          return {
+            ...sub,
+            totalQuestions: remote.totalQuestions,
+            durationMinutes: remote.durationMinutes,
+          };
+        }
+        return sub;
+      }));
+    }).catch(console.error);
+  }, []);
+
+  const currentSubject = subjects.find((s) => s.id === selectedSubjectId) || subjects[0];
 
   useEffect(() => {
     let interval: any;
@@ -103,7 +123,7 @@ export function ExamModeScreen({ onNavigate }: ExamModeScreenProps) {
   };
 
   const handleStartExam = async (subjectId: string) => {
-    const subject = mockSubjects.find(s => s.id === subjectId);
+    const subject = subjects.find(s => s.id === subjectId);
     if (subject) {
       setSelectedSubjectId(subjectId);
       setIsSelectingSubject(false);
@@ -201,7 +221,7 @@ export function ExamModeScreen({ onNavigate }: ExamModeScreenProps) {
         </header>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          {mockSubjects.map((sub) => {
+          {subjects.map((sub) => {
             const IconComponent = sub.icon;
             return (
               <Card

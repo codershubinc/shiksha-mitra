@@ -993,6 +993,21 @@ var ExamAttemptModel = mongoose3.models.ExamAttempt || mongoose3.model("ExamAtte
 
 // backend/controllers/quiz.controller.ts
 var quizController = {
+  async getAllQuizzes(req, res) {
+    try {
+      const quizzes = await QuizModel.find({}, "subjectId title durationMinutes questions").lean();
+      const summary = quizzes.map((q) => ({
+        id: q.subjectId,
+        title: q.title,
+        durationMinutes: q.durationMinutes,
+        totalQuestions: q.questions.length
+      }));
+      return res.json(summary);
+    } catch (err) {
+      console.error("getAllQuizzes error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
   async getQuiz(req, res) {
     try {
       const { subjectId } = req.params;
@@ -1061,6 +1076,7 @@ var quizController = {
 
 // backend/routes/quiz.routes.ts
 var router4 = Router4();
+router4.get("/all", quizController.getAllQuizzes);
 router4.get("/:subjectId", quizController.getQuiz);
 router4.post("/:subjectId/submit", quizController.submitAttempt);
 router4.get("/reports/all", quizController.getReports);
@@ -1084,6 +1100,9 @@ app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 app.use(cors({ origin: true, credentials: true }));
 app.use("/api", routes_default);
+app.get("/", (req, res) => {
+  res.send("hello from shiksha-mantra backend");
+});
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "healthy",

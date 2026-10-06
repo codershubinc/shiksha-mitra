@@ -3,6 +3,22 @@ import { QuizModel, ExamAttemptModel } from '../models/quiz.model.js';
 import { getAuthenticatedUser } from './auth.controller.js';
 
 export const quizController = {
+  async getAllQuizzes(req: Request, res: Response) {
+    try {
+      const quizzes = await QuizModel.find({}, 'subjectId title durationMinutes questions').lean();
+      const summary = quizzes.map(q => ({
+        id: q.subjectId,
+        title: q.title,
+        durationMinutes: q.durationMinutes,
+        totalQuestions: q.questions.length,
+      }));
+      return res.json(summary);
+    } catch (err) {
+      console.error('getAllQuizzes error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+
   async getQuiz(req: Request, res: Response) {
     try {
       const { subjectId } = req.params;
