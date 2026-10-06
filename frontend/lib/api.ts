@@ -2,9 +2,7 @@
 
 import { User } from '@/types';
 
-const BACKEND_URL = typeof window !== 'undefined' 
-  ? `${window.location.protocol}//${window.location.hostname}:3000`
-  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000');
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || (typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? 'https://aaxion-client.codershubinc.com' : 'http://localhost:3000');
 
 function url(path: string): string {
   const normalized = path.startsWith('/') ? path : `/${path}`;
